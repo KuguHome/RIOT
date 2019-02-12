@@ -31,13 +31,14 @@
 #include "periph/spi.h"
 
 #include "net/lora.h"
+#include "net/fsk.h"
 
 #include "sx127x.h"
 #include "sx127x_internal.h"
 #include "sx127x_registers.h"
 #include "sx127x_netdev.h"
 
-#define ENABLE_DEBUG (0)
+#define ENABLE_DEBUG (1)
 #include "debug.h"
 
 /* Internal functions */
@@ -53,6 +54,7 @@ static void sx127x_on_dio0_isr(void *arg);
 static void sx127x_on_dio1_isr(void *arg);
 static void sx127x_on_dio2_isr(void *arg);
 static void sx127x_on_dio3_isr(void *arg);
+static void sx127x_on_dio4_isr(void *arg);
 #else
 static void sx127x_on_dio_multi_isr(void *arg);
 #endif
@@ -119,7 +121,12 @@ int sx127x_init(sx127x_t *dev)
     sx127x_reset(dev);
 
 #if defined(MODULE_SX1276)
-    sx1276_rx_chain_calibration(dev);
+    if(dev->settings.modem == SX127X_MODEM_LORA) {
+        sx1276_rx_chain_calibration(dev, SX127X_HF_CHANNEL_LORA);
+    }
+    else {
+        sx1276_rx_chain_calibration(dev, FSK_HF_CHANNEL_DEFAULT);
+    }
 #endif
     sx127x_set_op_mode(dev, SX127X_RF_OPMODE_SLEEP);
 
@@ -131,9 +138,9 @@ int sx127x_init(sx127x_t *dev)
     return SX127X_INIT_OK;
 }
 
-void sx127x_init_radio_settings(sx127x_t *dev)
+void sx127x_init_lora_settings(sx127x_t *dev)
 {
-    DEBUG("[sx127x] initializing radio settings\n");
+    DEBUG("[sx127x] initializing LoRa settings\n");
     sx127x_set_channel(dev, SX127X_CHANNEL_DEFAULT);
     sx127x_set_modem(dev, SX127X_MODEM_DEFAULT);
     sx127x_set_tx_power(dev, SX127X_RADIO_TX_POWER);
@@ -150,6 +157,50 @@ void sx127x_init_radio_settings(sx127x_t *dev)
     sx127x_set_symbol_timeout(dev, LORA_SYMBOL_TIMEOUT_DEFAULT);
     sx127x_set_rx_single(dev, SX127X_RX_SINGLE);
     sx127x_set_tx_timeout(dev, SX127X_TX_TIMEOUT_DEFAULT);
+}
+
+void sx127x_init_fsk_settings(sx127x_t *dev)
+{
+    DEBUG("[sx127x] initializing FSK settings\n");
+    sx127x_set_modem(dev, SX127X_MODEM_FSK);
+#if defined(MODULE_SX1276)
+    sx127x_set_tx_power(dev, 20);
+#else /* MODULE_SX1272 */
+    sx127x_set_tx_power(dev, 14);
+#endif
+    sx127x_set_fsk_mod_shaping(dev, SX127X_RF_PARAMP_MODULATIONSHAPING_01);
+    sx127x_set_lna(dev, SX127X_RF_LNA_GAIN_G1);
+    sx127x_fsk_set_afc(dev, false);
+    sx127x_set_syncconfig(dev, SX127X_RF_SYNCCONFIG_AUTORESTARTRXMODE_WAITPLL_OFF,
+                              SX127X_RF_SYNCCONFIG_PREAMBLEPOLARITY_AA,
+                              SX127X_RF_SYNCCONFIG_SYNC_ON,
+                              SX127X_RF_SYNCCONFIG_SYNCSIZE_2);
+    sx127x_fsk_set_syncword(dev, FSK_SYNCWORD_SYNCVALUE1, 1);
+    sx127x_fsk_set_syncword(dev, FSK_SYNCWORD_SYNCVALUE2, 2);
+    sx127x_fsk_set_preamble_detect(dev, SX127X_RF_PREAMBLEDETECT_DETECTOR_ON);
+    sx127x_fsk_set_preamble_detector_size(dev, SX127X_RF_PREAMBLEDETECT_DETECTORSIZE_1);
+    sx127x_fsk_set_preamble_detector_tol(dev, SX127X_RF_PREAMBLEDETECT_DETECTORTOL_10);
+    //sx127x_set_payload_length(dev, FSK_PAYLOADLENGTH_DEFAULT);
+    sx127x_set_packetconfig1(dev, SX127X_RF_PACKETCONFIG1_PACKETFORMAT_VARIABLE,
+                             SX127X_RF_PACKETCONFIG1_DCFREE_OFF,
+                             SX127X_RF_PACKETCONFIG1_CRC_OFF,
+                             SX127X_RF_PACKETCONFIG1_CRCAUTOCLEAR_ON,
+                             SX127X_RF_PACKETCONFIG1_ADDRSFILTERING_OFF,
+                             SX127X_RF_PACKETCONFIG1_CRCWHITENINGTYPE_CCITT);
+    sx127x_set_packetconfig2(dev, SX127X_RF_PACKETCONFIG2_WMBUS_CRC_DISABLE,
+                             SX127X_RF_PACKETCONFIG2_DATAMODE_CONTINUOUS,
+                             SX127X_RF_PACKETCONFIG2_IOHOME_OFF,
+                             SX127X_RF_PACKETCONFIG2_BEACON_OFF);
+    sx127x_set_channel(dev, FSK_CHANNEL_DEFAULT);
+    sx127x_set_bitrate(dev, FSK_BITRATE_DEFAULT);
+    sx127x_set_freqdev(dev, FSK_FREQ_DEV_DEFAULT);
+    sx127x_set_rxbw(dev, 0, FSK_BANDWIDTH_DEFAULT);
+    sx127x_set_afcbw(dev, FSK_AFC_BANDWIDTH_DEFAULT);
+    sx127x_fsk_set_rssi_offset(dev, 0);
+    sx127x_set_standby(dev);
+#if defined(MODULE_SX1276)
+    sx1276_rx_chain_calibration(dev, FSK_HF_CHANNEL_DEFAULT);
+#endif
 }
 
 uint32_t sx127x_random(sx127x_t *dev)
@@ -181,6 +232,102 @@ uint32_t sx127x_random(sx127x_t *dev)
     sx127x_set_sleep(dev);
 
     return rnd;
+}
+
+int sx127x_config_dio(sx127x_t *dev, gpio_t pin, gpio_mode_t mode,
+                      gpio_flank_t flank, uint8_t dio, bool is_int)
+{
+    int res = -1;
+
+    switch (dio) {
+    case 0:
+        if (is_int) {
+            res = gpio_init_int(pin, mode, flank, sx127x_on_dio0_isr, dev);
+            if (res < 0) {
+                DEBUG("[sx127x] error: failed to initialize DIO0 pin\n");
+                return res;
+            }
+        }
+        else {
+            res = gpio_init(pin, mode);
+            if (res < 0) {
+                DEBUG("[sx127x] error: failed to initialize DIO0 pin\n");
+                return res;
+            }
+        }
+        break;
+
+    case 1:
+        if (is_int) {
+            res = gpio_init_int(pin, mode, flank, sx127x_on_dio1_isr, dev);
+            if (res < 0) {
+                DEBUG("[sx127x] error: failed to initialize DIO1 pin\n");
+                return res;
+            }
+        }
+        else {
+            res = gpio_init(pin, mode);
+            if (res < 0) {
+                DEBUG("[sx127x] error: failed to initialize DIO1 pin\n");
+                return res;
+            }
+        }
+        break;
+
+    case 2:
+        if (is_int) {
+            res = gpio_init_int(pin, mode, flank, sx127x_on_dio2_isr, dev);
+            if (res < 0) {
+                DEBUG("[sx127x] error: failed to initialize DIO2 pin\n");
+                return res;
+            }
+        }
+        else {
+            res = gpio_init(pin, mode);
+            if (res < 0) {
+                DEBUG("[sx127x] error: failed to initialize DIO2 pin\n");
+                return res;
+            }
+        }
+        break;
+
+    case 3:
+        if (is_int) {
+            res = gpio_init_int(pin, mode, flank, sx127x_on_dio3_isr, dev);
+            if (res < 0) {
+                DEBUG("[sx127x] error: failed to initialize DIO3 pin\n");
+                return res;
+            }
+        }
+        else {
+            res = gpio_init(pin, mode);
+            if (res < 0) {
+                DEBUG("[sx127x] error: failed to initialize DIO3 pin\n");
+                return res;
+            }
+        }
+        break;
+
+
+    case 4:
+        if (is_int) {
+            res = gpio_init_int(pin, mode, flank, sx127x_on_dio4_isr, dev);
+            if (res < 0) {
+                DEBUG("[sx127x] error: failed to initialize DIO4 pin\n");
+                return res;
+            }
+        }
+        else {
+            res = gpio_init(pin, mode);
+            if (res < 0) {
+                DEBUG("[sx127x] error: failed to initialize DIO4 pin\n");
+                return res;
+            }
+        }
+        break;
+    }
+
+    return res;
 }
 
 /**
@@ -219,6 +366,11 @@ static void sx127x_on_dio3_isr(void *arg)
 {
     sx127x_on_dio_isr((sx127x_t*) arg, SX127X_IRQ_DIO3);
 }
+
+static void sx127x_on_dio4_isr(void *arg)
+{
+    sx127x_on_dio_isr((sx127x_t*) arg, SX127X_IRQ_DIO4);
+}
 #else
 static void sx127x_on_dio_multi_isr(void *arg)
 {
@@ -234,12 +386,7 @@ static int _init_gpios(sx127x_t *dev)
 #ifndef SX127X_USE_DIO_MULTI
     /* Check if DIO0 pin is defined */
     if (dev->params.dio0_pin != GPIO_UNDEF) {
-        res = gpio_init_int(dev->params.dio0_pin, GPIO_IN, GPIO_RISING,
-                                sx127x_on_dio0_isr, dev);
-        if (res < 0) {
-            DEBUG("[sx127x] error: failed to initialize DIO0 pin\n");
-            return res;
-        }
+        res = sx127x_config_dio(dev, dev->params.dio0_pin, GPIO_IN, GPIO_RISING, 0, true);
     }
     else {
         DEBUG("[sx127x] error: no DIO0 pin defined\n");
@@ -249,8 +396,7 @@ static int _init_gpios(sx127x_t *dev)
 
     /* Check if DIO1 pin is defined */
     if (dev->params.dio1_pin != GPIO_UNDEF) {
-        res = gpio_init_int(dev->params.dio1_pin, GPIO_IN, GPIO_RISING,
-                                sx127x_on_dio1_isr, dev);
+        res = sx127x_config_dio(dev, dev->params.dio1_pin, GPIO_IN, GPIO_RISING, 1, true);
         if (res < 0) {
             DEBUG("[sx127x] error: failed to initialize DIO1 pin\n");
             return res;
@@ -259,8 +405,7 @@ static int _init_gpios(sx127x_t *dev)
 
     /* check if DIO2 pin is defined */
     if (dev->params.dio2_pin != GPIO_UNDEF) {
-        res = gpio_init_int(dev->params.dio2_pin, GPIO_IN, GPIO_RISING,
-                            sx127x_on_dio2_isr, dev);
+        res = sx127x_config_dio(dev, dev->params.dio2_pin, GPIO_IN, GPIO_RISING, 2, true);
         if (res < 0) {
             DEBUG("[sx127x] error: failed to initialize DIO2 pin\n");
             return res;
@@ -269,13 +414,22 @@ static int _init_gpios(sx127x_t *dev)
 
     /* check if DIO3 pin is defined */
     if (dev->params.dio3_pin != GPIO_UNDEF) {
-        res = gpio_init_int(dev->params.dio3_pin, GPIO_IN, GPIO_RISING,
-                            sx127x_on_dio3_isr, dev);
+        res = sx127x_config_dio(dev, dev->params.dio3_pin, GPIO_IN, GPIO_RISING, 3, true);
         if (res < 0) {
             DEBUG("[sx127x] error: failed to initialize DIO3 pin\n");
             return res;
         }
     }
+
+    /* check if DIO4 pin is defined */
+    if (dev->params.dio4_pin != GPIO_UNDEF) {
+        res = sx127x_config_dio(dev, dev->params.dio4_pin, GPIO_IN, GPIO_RISING, 4, true);
+        if (res < 0) {
+            DEBUG("[sx127x] error: failed to initialize DIO4 pin\n");
+            return res;
+        }
+    }
+
 #else
     if (dev->params.dio_multi_pin != GPIO_UNDEF) {
         DEBUG("[sx127x] info: Trying to initialize DIO MULTI pin\n");

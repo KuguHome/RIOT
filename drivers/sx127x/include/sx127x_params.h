@@ -60,6 +60,14 @@ extern "C" {
 #define SX127X_PARAM_DIO3                   GPIO_PIN(1, 4)       /* D5 */
 #endif
 
+#ifndef SX127X_PARAM_DIO4
+#define SX127X_PARAM_DIO4                   GPIO_UNDEF           /* not defined */
+#endif
+
+#ifndef SX127X_PARAM_DIO5
+#define SX127X_PARAM_DIO5                   GPIO_UNDEF           /* not defined */
+#endif
+
 #ifndef SX127X_PARAM_DIO_MULTI
 #define SX127X_PARAM_DIO_MULTI              GPIO_UNDEF
 #endif
@@ -77,6 +85,8 @@ extern "C" {
                                     .dio1_pin  = SX127X_PARAM_DIO1,         \
                                     .dio2_pin  = SX127X_PARAM_DIO2,         \
                                     .dio3_pin  = SX127X_PARAM_DIO3,         \
+                                    .dio4_pin  = SX127X_PARAM_DIO4,         \
+                                    .dio5_pin  = SX127X_PARAM_DIO5,         \
                                     .dio_multi_pin = SX127X_PARAM_DIO_MULTI,\
                                     .paselect  = SX127X_PARAM_PASELECT }
 #else
@@ -87,6 +97,8 @@ extern "C" {
                                     .dio1_pin  = SX127X_PARAM_DIO1,         \
                                     .dio2_pin  = SX127X_PARAM_DIO2,         \
                                     .dio3_pin  = SX127X_PARAM_DIO3,         \
+									.dio4_pin  = SX127X_PARAM_DIO4,         \
+									.dio5_pin  = SX127X_PARAM_DIO5,         \
                                     .paselect  = SX127X_PARAM_PASELECT }
 #endif
 #endif

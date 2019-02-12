@@ -164,6 +164,12 @@ extern "C" {
 #define SX127X_RF_LORA_PACONFIG_OUTPUTPOWER_MASK                     (0xF0)
 
 /* RegPaRamp */
+#define SX127X_RF_PARAMP_MODULATIONSHAPING_MASK                      (0x9F)
+#define SX127X_RF_PARAMP_MODULATIONSHAPING_00                        (0x00) /* Default */
+#define SX127X_RF_PARAMP_MODULATIONSHAPING_01                        (0x20)
+#define SX127X_RF_PARAMP_MODULATIONSHAPING_10                        (0x40)
+#define SX127X_RF_PARAMP_MODULATIONSHAPING_11                        (0x60)
+
 #define SX127X_RF_LORA_PARAMP_TXBANDFORCE_MASK                       (0xEF)
 #define SX127X_RF_LORA_PARAMP_TXBANDFORCE_BAND_SEL                   (0x10)
 #define SX127X_RF_LORA_PARAMP_TXBANDFORCE_AUTO                       (0x00) /* Default */

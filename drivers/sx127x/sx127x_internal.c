@@ -113,7 +113,7 @@ void sx127x_read_fifo(const sx127x_t *dev, uint8_t *buffer, uint8_t size)
 }
 
 #if defined(MODULE_SX1276)
-void sx1276_rx_chain_calibration(sx127x_t *dev)
+void sx1276_rx_chain_calibration(sx127x_t *dev, uint32_t hf_channel)
 {
     uint8_t reg_pa_config_init_val;
     uint32_t initial_freq;
@@ -138,7 +138,7 @@ void sx1276_rx_chain_calibration(sx127x_t *dev)
     }
 
     /* Set a frequency in HF band */
-    sx127x_set_channel(dev, SX127X_HF_CHANNEL_DEFAULT);
+    sx127x_set_channel(dev, hf_channel);
 
     /* Launch Rx chain calibration for HF band */
     sx127x_reg_write(dev,
@@ -187,6 +187,7 @@ void sx127x_start_cad(sx127x_t *dev)
 {
     switch (dev->settings.modem) {
         case SX127X_MODEM_FSK:
+            DEBUG("[sx127x] No CAD in FSK mode\n");
             break;
         case SX127X_MODEM_LORA:
             /* Disable all interrupts except CAD-related */

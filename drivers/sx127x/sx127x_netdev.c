@@ -24,13 +24,14 @@
 #include "net/netopt.h"
 #include "net/netdev.h"
 #include "net/lora.h"
+#include "net/fsk.h"
 
 #include "sx127x_registers.h"
 #include "sx127x_internal.h"
 #include "sx127x_netdev.h"
 #include "sx127x.h"
 
-#define ENABLE_DEBUG (0)
+#define ENABLE_DEBUG (1)
 #include "debug.h"
 
 /* Internal helper functions */
@@ -40,6 +41,8 @@ void _on_dio0_irq(void *arg);
 void _on_dio1_irq(void *arg);
 void _on_dio2_irq(void *arg);
 void _on_dio3_irq(void *arg);
+void _on_dio4_irq(void *arg);
+void _on_dio5_irq(void *arg);
 
 static int _send(netdev_t *netdev, const iolist_t *iolist)
 {
@@ -55,7 +58,41 @@ static int _send(netdev_t *netdev, const iolist_t *iolist)
 
     switch (dev->settings.modem) {
         case SX127X_MODEM_FSK:
-            /* todo */
+            {
+                dev->settings.fsk.pkt_handler.nb_bytes = 0;
+                dev->settings.fsk.pkt_handler.size = size;
+                /* FIFO operations can not take place in Sleep mode
+                 * So wake up the chip */
+                if (sx127x_get_op_mode(dev) == SX127X_RF_OPMODE_SLEEP) {
+                    sx127x_set_standby(dev);
+                    xtimer_usleep(SX127X_RADIO_WAKEUP_TIME); /* wait for chip wake up */
+                }
+
+                if((sx127x_get_packetconfig1(dev) & SX127X_RF_PACKETCONFIG1_PACKETFORMAT_MASK)
+                        == SX127X_RF_PACKETCONFIG1_PACKETFORMAT_FIXED) {
+                    /**
+                     * for fixed length mode data must be sent by chunks,
+                     * and it's not managed by this driver
+                     */
+                    if ((size > 0) && (size <= 64)) {
+                        dev->settings.fsk.pkt_handler.chunk_size = size;
+                    }
+                    else {
+                        dev->settings.fsk.pkt_handler.chunk_size = 32;
+                    }
+
+                    const iolist_t *iol = iolist;
+                    sx127x_write_fifo(dev, iol->iol_base,
+                                      dev->settings.fsk.pkt_handler.chunk_size);
+                    dev->settings.fsk.pkt_handler.nb_bytes +=
+                    dev->settings.fsk.pkt_handler.chunk_size;
+                }
+                else {
+                    for (const iolist_t *iol = iolist; iol; iol = iol->iol_next) {
+                        sx127x_write_fifo(dev, iol->iol_base, iol->iol_len);
+                    }
+                }
+            }
             break;
         case SX127X_MODEM_LORA:
             /* Initializes the payload size */
@@ -114,10 +151,86 @@ static int _recv(netdev_t *netdev, void *buf, size_t len, void *info)
     sx127x_t *dev = (sx127x_t*) netdev;
     volatile uint8_t irq_flags = 0;
     uint8_t size = 0;
+
     switch (dev->settings.modem) {
         case SX127X_MODEM_FSK:
-            /* todo */
-            break;
+        {
+            /* Check CRC only if fixed packet length is used */
+            if ((dev->settings.fsk.flags & SX127X_FIX_LEN_FLAG)) {
+                if (dev->settings.fsk.flags & SX127X_CRC_ON_FLAG) {
+                    irq_flags = sx127x_reg_read(dev, SX127X_REG_IRQFLAGS2);
+
+                    if (!(irq_flags & SX127X_RF_IRQFLAGS2_CRCOK)) {
+                        sx127x_reg_write(dev, SX127X_REG_IRQFLAGS1,
+                                SX127X_RF_IRQFLAGS1_RSSI |
+                                SX127X_RF_IRQFLAGS1_PREAMBLEDETECT |
+                                SX127X_RF_IRQFLAGS1_SYNCADDRESSMATCH);
+                        sx127x_reg_write(dev, SX127X_REG_IRQFLAGS2,
+                                SX127X_RF_IRQFLAGS2_FIFOOVERRUN);
+                        if ((dev->settings.fsk.pktconfig2 & SX127X_RF_PACKETCONFIG2_DATAMODE_CONTINUOUS) == false) {
+                            sx127x_set_state(dev, SX127X_RF_IDLE);
+                        }
+                        else {
+                            sx127x_reg_write(dev, SX127X_REG_RXCONFIG,
+                                    sx127x_reg_read(dev, SX127X_REG_RXCONFIG) |
+                                    SX127X_RF_RXCONFIG_RESTARTRXWITHOUTPLLLOCK);
+                        }
+
+                        dev->settings.fsk.flags &= ~SX127X_PREAMBLE_DETECTED_FLAG;
+                        dev->settings.fsk.flags &= ~SX127X_SYNC_WORD_DETECTED_FLAG;
+                        dev->settings.fsk.pkt_handler.nb_bytes = 0;
+                        dev->settings.fsk.pkt_handler.size = 0;
+                        netdev->event_callback(netdev, NETDEV_EVENT_CRC_ERROR);
+                        sx127x_set_state(dev, SX127X_RF_IDLE);
+                        break;
+                    }
+                }
+            }
+
+            /* Process the payload */
+            if (buf == NULL && len == 0) {
+                if ((dev->settings.fsk.flags & SX127X_FIX_LEN_FLAG) == false) {
+                    /* Read only the length value */
+                    sx127x_read_fifo(dev, (uint8_t*)&(dev->settings.fsk.pkt_handler.size),
+                                     1);
+                    size = dev->settings.fsk.pkt_handler.size;
+                    DEBUG("[sx127x] netdev->_recv: received %d bytes\n", size);
+                    break;
+                }
+                else {
+                    dev->settings.fsk.pkt_handler.size = sx127x_reg_read(dev, SX127X_REG_PAYLOADLENGTH);
+                    break;
+                }
+            }
+            else {
+                if ((dev->settings.fsk.flags & SX127X_RX_FSK_CONTINUOUS_FLAG) == false) {
+                    DEBUG("[sx127x] netdev: Packet mode -> going IDLE\n");
+                    sx127x_set_standby(dev);
+                }
+                else {
+                    /* Restart RX */
+                    sx127x_reg_write(dev, SX127X_REG_RXCONFIG,
+                                     sx127x_reg_read(dev, SX127X_REG_RXCONFIG) |
+                                     SX127X_RF_RXCONFIG_RESTARTRXWITHOUTPLLLOCK);
+                }
+                sx127x_read_fifo(dev, buf + dev->settings.fsk.pkt_handler.nb_bytes,
+                                 dev->settings.fsk.pkt_handler.size -
+                                 dev->settings.fsk.pkt_handler.nb_bytes);
+
+                dev->settings.fsk.pkt_handler.nb_bytes += (dev->settings.fsk.pkt_handler.size -
+                                                           dev->settings.fsk.pkt_handler.nb_bytes);
+            }
+
+            netdev_sx127x_packet_info_t *packet_info = info;
+            packet_info->rssi = dev->settings.fsk.pkt_handler.rssi_value;
+
+            /* Reset status */
+            dev->settings.fsk.flags &= ~SX127X_PREAMBLE_DETECTED_FLAG;
+            dev->settings.fsk.flags &= ~SX127X_SYNC_WORD_DETECTED_FLAG;
+            dev->settings.fsk.pkt_handler.nb_bytes = 0;
+            dev->settings.fsk.pkt_handler.size = 0;
+        }
+        break;
         case SX127X_MODEM_LORA:
             /* Clear IRQ */
             sx127x_reg_write(dev, SX127X_REG_LR_IRQFLAGS, SX127X_RF_LORA_IRQFLAGS_RXDONE);
@@ -138,7 +251,7 @@ static int _recv(netdev_t *netdev, void *buf, size_t len, void *info)
                 return -EBADMSG;
             }
 
-            netdev_sx127x_lora_packet_info_t *packet_info = info;
+            netdev_sx127x_packet_info_t *packet_info = info;
             if (packet_info) {
                 /* there is no LQI for LoRa */
                 packet_info->lqi = 0;
@@ -225,7 +338,14 @@ static int _init(netdev_t *netdev)
         return -1;
     }
 
-    sx127x_init_radio_settings(sx127x);
+    /* Configure radio according to the requested mode */
+    if(settings.modem == SX127X_MODEM_LORA) {
+        sx127x_init_lora_settings(sx127x);
+    }
+    else {
+        sx127x_init_fsk_settings(sx127x);
+    }
+
     /* Put chip into sleep */
     sx127x_set_sleep(sx127x);
 
@@ -248,6 +368,8 @@ static void _isr(netdev_t *netdev)
         switch (interruptReg) {
             case SX127X_RF_LORA_IRQFLAGS_TXDONE:
             case SX127X_RF_LORA_IRQFLAGS_RXDONE:
+            case SX127X_RF_IRQFLAGS1_TXREADY:
+            case SX127X_RF_IRQFLAGS1_RXREADY:
                 irq = SX127X_IRQ_DIO0;
                 break;
 
@@ -289,6 +411,14 @@ static void _isr(netdev_t *netdev)
             _on_dio3_irq(dev);
             break;
 
+        case SX127X_IRQ_DIO4:
+            _on_dio4_irq(dev);
+            break;
+
+        case SX127X_IRQ_DIO5:
+            _on_dio5_irq(dev);
+            break;
+
         default:
             break;
     }
@@ -310,7 +440,12 @@ static int _get(netdev_t *netdev, netopt_t opt, void *val, size_t max_len)
 
         case NETOPT_DEVICE_TYPE:
             assert(max_len >= sizeof(uint16_t));
-            *((uint16_t*) val) = NETDEV_TYPE_LORA;
+            if (dev->settings.modem == SX127X_MODEM_LORA) {
+                *((uint16_t*) val) = NETDEV_TYPE_LORA;
+            }
+            else if (dev->settings.modem == SX127X_MODEM_FSK) {
+                *((uint16_t*) val) = NETDEV_TYPE_FSK;
+            }
             return sizeof(uint16_t);
 
         case NETOPT_CHANNEL_FREQUENCY:
@@ -393,13 +528,13 @@ static int _set(netdev_t *netdev, netopt_t opt, const void *val, size_t len)
 
         case NETOPT_DEVICE_TYPE:
             assert(len <= sizeof(uint16_t));
-            /* Only LoRa modem is supported for the moment */
             if (*(const uint16_t*) val == NETDEV_TYPE_LORA) {
                 sx127x_set_modem(dev, SX127X_MODEM_LORA);
                 return sizeof(uint16_t);
             }
             else {
-                return -EINVAL;
+                sx127x_set_modem(dev, SX127X_MODEM_FSK);
+                return sizeof(uint16_t);
             }
 
         case NETOPT_CHANNEL_FREQUENCY:
@@ -581,10 +716,24 @@ void _on_dio0_irq(void *arg)
 {
     sx127x_t *dev = (sx127x_t *) arg;
     netdev_t *netdev = (netdev_t*) &dev->netdev;
-
     switch (dev->settings.state) {
         case SX127X_RF_RX_RUNNING:
-            netdev->event_callback(netdev, NETDEV_EVENT_RX_COMPLETE);
+            if ((dev->settings.fsk.flags & SX127X_RX_FSK_CONTINUOUS_FLAG) == false) {
+                DEBUG("[sx127x] netdev: sx127x_on_dio0 -> PayloadReady\n");
+                /* In packet mode this should mean a good payload is ready */
+                netdev->event_callback(netdev, NETDEV_EVENT_RX_COMPLETE);
+            }
+            else {
+                DEBUG("[sx127x] netdev: dio0 -> SyncAddress\n");
+                if ((dev->settings.fsk.flags & SX127X_PREAMBLE_DETECTED_FLAG) &&
+                    ((dev->settings.fsk.flags & SX127X_SYNC_WORD_DETECTED_FLAG) == false)) {
+                    dev->settings.fsk.flags |= SX127X_SYNC_WORD_DETECTED_FLAG;
+                    dev->settings.fsk.pkt_handler.rssi_value = sx127x_read_rssi(dev);
+                    dev->settings.fsk.afc_value = (int32_t)(double)(((uint16_t)sx127x_reg_read(dev, SX127X_REG_AFCMSB) << 8) |
+                                                  (uint16_t)sx127x_reg_read(dev, SX127X_REG_AFCLSB)) * FSK_FREQ_STEP_DEFAULT;
+                    dev->settings.fsk.rx_gain = (sx127x_reg_read(dev, SX127X_REG_LNA) >> 5) & 0x07;
+                }
+            }
             break;
         case SX127X_RF_TX_RUNNING:
             xtimer_remove(&dev->_internal.tx_timeout_timer);
@@ -593,8 +742,9 @@ void _on_dio0_irq(void *arg)
                     /* Clear IRQ */
                     sx127x_reg_write(dev, SX127X_REG_LR_IRQFLAGS,
                                      SX127X_RF_LORA_IRQFLAGS_TXDONE);
-                /* Intentional fall-through */
+                    /* Intentional fall through */
                 case SX127X_MODEM_FSK:
+                    /* Nothing to do, IRQ cleared automatically by the chip */
                 default:
                     sx127x_set_state(dev, SX127X_RF_IDLE);
                     netdev->event_callback(netdev, NETDEV_EVENT_TX_COMPLETE);
@@ -621,7 +771,14 @@ void _on_dio1_irq(void *arg)
         case SX127X_RF_RX_RUNNING:
             switch (dev->settings.modem) {
                 case SX127X_MODEM_FSK:
-                    /* todo */
+                    if ((dev->settings.fsk.flags & SX127X_RX_FSK_CONTINUOUS_FLAG) == false) {
+                        DEBUG("[sx127x] netdev: sx127x_on_dio1 -> FifoLevel\n");
+                        /* FifoLevel interrupt, some payload is available */
+                        //netdev->event_callback(netdev, NETDEV_EVENT_RX_COMPLETE);
+                    }
+                    else {
+
+                    }
                     break;
                 case SX127X_MODEM_LORA:
                     xtimer_remove(&dev->_internal.rx_timeout_timer);
@@ -646,7 +803,7 @@ void _on_dio1_irq(void *arg)
             }
             break;
         default:
-            puts("[sx127x] netdev: sx127x_on_dio1: unknown state");
+            //puts("[sx127x] netdev: sx127x_on_dio1: unknown state");
             break;
     }
 }
@@ -661,7 +818,20 @@ void _on_dio2_irq(void *arg)
         case SX127X_RF_RX_RUNNING:
             switch (dev->settings.modem) {
                 case SX127X_MODEM_FSK:
-                    /* todo */
+                    DEBUG("[sx127x] netdev: sx127x_on_dio2 -> SyncAddress\n");
+                    if ((dev->settings.fsk.flags & SX127X_RX_FSK_CONTINUOUS_FLAG) == false) {
+                        if ((dev->settings.fsk.flags & SX127X_PREAMBLE_DETECTED_FLAG) &&
+                                ((dev->settings.fsk.flags & SX127X_SYNC_WORD_DETECTED_FLAG) == false)) {
+                            dev->settings.fsk.flags |= SX127X_SYNC_WORD_DETECTED_FLAG;
+                            dev->settings.fsk.pkt_handler.rssi_value = sx127x_read_rssi(dev);
+                            dev->settings.fsk.afc_value = (int32_t)(double)(((uint16_t)sx127x_reg_read(dev, SX127X_REG_AFCMSB) << 8) |
+                                                          (uint16_t)sx127x_reg_read(dev, SX127X_REG_AFCLSB)) * FSK_FREQ_STEP_DEFAULT;
+                            dev->settings.fsk.rx_gain = (sx127x_reg_read(dev, SX127X_REG_LNA) >> 5) & 0x07;
+                        }
+                    }
+                    else {
+                        /* Data */
+                    }
                     break;
                 case SX127X_MODEM_LORA:
                     if (dev->settings.lora.flags & SX127X_CHANNEL_HOPPING_FLAG) {
@@ -712,6 +882,15 @@ void _on_dio3_irq(void *arg)
 
     switch (dev->settings.modem) {
         case SX127X_MODEM_FSK:
+            if ((dev->settings.fsk.flags & SX127X_RX_FSK_CONTINUOUS_FLAG) == false) {
+                DEBUG("[sx127x] netdev: sx127x_on_dio3 -> FifoEmpty\n");
+                /* FifoEmpty interrupt, switch to RX state */
+                uint8_t state = NETOPT_STATE_RX;
+                netdev->driver->set(netdev, NETOPT_STATE, &state, sizeof(state));
+            }
+            else {
+                /* TempChange/LowBat -> nothing to do... */
+            }
             break;
         case SX127X_MODEM_LORA:
             /* Clear IRQ */
@@ -727,6 +906,45 @@ void _on_dio3_irq(void *arg)
             break;
         default:
             puts("[sx127x] netdev: sx127x_on_dio3: unknown modem");
+            break;
+    }
+}
+
+void _on_dio4_irq(void *arg)
+{
+    /* Get interrupt context */
+    sx127x_t *dev = (sx127x_t *) arg;
+
+    switch (dev->settings.modem) {
+        case SX127X_MODEM_FSK:
+            /* PreambleDetected interrupt, only available in fixed packet length mode */
+            if ((dev->settings.fsk.flags & SX127X_PREAMBLE_DETECTED_FLAG) == false) {
+                DEBUG("[sx127x] netdev: sx127x_on_dio4 -> PreambleDetected\n");
+                dev->settings.fsk.flags |= SX127X_PREAMBLE_DETECTED_FLAG;
+            }
+            break;
+        case SX127X_MODEM_LORA:
+            break;
+        default:
+            puts("[sx127x] netdev: sx127x_on_dio4: unknown modem");
+            break;
+    }
+}
+
+void _on_dio5_irq(void *arg)
+{
+    /* Get interrupt context */
+    sx127x_t *dev = (sx127x_t *) arg;
+
+    /* dummy handler for now */
+
+    switch (dev->settings.modem) {
+        case SX127X_MODEM_FSK:
+            break;
+        case SX127X_MODEM_LORA:
+            break;
+        default:
+            puts("[sx127x] netdev: sx127x_on_dio5: unknown modem");
             break;
     }
 }

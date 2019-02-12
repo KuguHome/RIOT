@@ -127,8 +127,9 @@ int16_t sx127x_read_rssi(const sx127x_t *dev);
  *          default values
  *
  * @param[in] dev                      The sx127x device structure pointer
+ * @param[in] hf_channel               Base frequency to perform calibration
  */
-void sx1276_rx_chain_calibration(sx127x_t *dev);
+void sx1276_rx_chain_calibration(sx127x_t *dev, uint32_t hf_channel);
 #endif
 
 #ifdef __cplusplus
