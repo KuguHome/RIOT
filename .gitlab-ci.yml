@@ -1,0 +1,59 @@
+stages:
+  - test
+  - build
+  - deploy
+
+static-tests:
+  tags:
+    - x86
+    - docker
+
+  stage: test
+
+  image:
+    name: riot/riotbuild
+    entrypoint: [""] #["bash","-c"]
+
+  script:
+    - make static-test
+
+  allow_failure: true
+
+build:
+  tags:
+    - x86
+    - docker
+
+  stage: build
+
+  image:
+    name: riot/riotbuild
+    entrypoint: [""] #["bash","-c"]
+
+  artifacts:
+    paths:
+      - /builds/riot/RIOT/tests/wmbus/bin/b-l072z-lrwan1/tests_wmbus.elf
+    expire_in: 1 week
+
+  script:
+     - make -C tests/wmbus/ all
+
+  allow_failure: false
+
+deploy:
+  tags:
+    - x86
+    - docker
+
+  stage: deploy
+
+  image:
+    name: riot/riotbuild
+    entrypoint: [""] #["bash","-c"]
+
+  script:
+     - eval "$(ssh-agent -s)"
+     - ssh-add <(echo "$SSH_DEPLOY_PRIVATEKEY")
+     - scp -o ForwardAgent=yes -vvv -o StrictHostKeyChecking=no -o ProxyCommand="ssh -vvv -o ForwardAgent=yes -o StrictHostKeyChecking=no jumper@dev.kugu-home.com -W %h:%p" -P 2055 /builds/riot/RIOT/tests/wmbus/bin/b-l072z-lrwan1/tests_wmbus.elf kugu@localhost:/home/kugu/RIOT-OS/RIOT/tests/wmbus/bin/b-l072z-lrwan1
+     - ssh -o ProxyCommand="ssh jumper@dev.kugu-home.com -W %h:%p" -p 2055 kugu@localhost "cd /home/kugu/RIOT-OS/RIOT/tests/wmbus && make flash-only"
+     
