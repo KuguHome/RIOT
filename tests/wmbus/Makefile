@@ -1,4 +1,4 @@
-BOARD ?= lobaro-lorabox
+BOARD ?= b-l072z-lrwan1
 
 include ../Makefile.tests_common
 
@@ -10,7 +10,7 @@ USEMODULE += shell_commands
 USEMODULE += ps
 USEMODULE += xtimer
 
-DRIVER ?= sx1272
+DRIVER ?= sx1276
 
 # use SX1276 by default
 USEMODULE += $(DRIVER)
