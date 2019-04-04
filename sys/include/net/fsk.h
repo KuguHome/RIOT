@@ -40,26 +40,26 @@ extern "C" {
 
 /** @brief Frequency step in Hz */
 #ifndef FSK_FREQ_STEP_DEFAULT
-#define FSK_FREQ_STEP_DEFAULT      (61.03515625)              /**< Step frequency between channels */
+#define FSK_FREQ_STEP_DEFAULT      (61.03515625)                /**< Step frequency between channels */
 #endif
 #ifndef FSK_CHANNEL_DEFAULT
-#define FSK_CHANNEL_DEFAULT        (868950000UL)              /**< Default FSK frequency, 868.95MHz (Europe) */
+#define FSK_CHANNEL_DEFAULT        (868950000UL)                /**< Default FSK frequency, 868.95MHz (Europe) */
 #endif
 #ifndef FSK_HF_CHANNEL_DEFAULT
-#define FSK_HF_CHANNEL_DEFAULT     (860000000UL)              /**< Use to calibrate RX chain for LF and HF bands */
+#define FSK_HF_CHANNEL_DEFAULT     (860000000UL)                /**< Use to calibrate RX chain for LF and HF bands */
 #endif
 #ifndef FSK_BITRATE_DEFAULT
-#define FSK_BITRATE_DEFAULT        (32768UL)                 /**< Bitrate at 32.768kpbs */
+#define FSK_BITRATE_DEFAULT        (32768UL)                   /**< Bitrate at 100kpbs */
 #endif
 #ifndef FSK_FREQ_DEV_DEFAULT
-#define FSK_FREQ_DEV_DEFAULT       (38000UL)                  /**< 38KHz frequency deviation */
+#define FSK_FREQ_DEV_DEFAULT       (50000UL)                    /**< 50KHz frequency deviation */
 #endif
 #ifndef FSK_BANDWIDTH_DEFAULT
-#define FSK_BANDWIDTH_DEFAULT      (FSK_BITRATE_DEFAULT + 2 \
-		                             * FSK_FREQ_DEV_DEFAULT)  /**< Bandwidth calculation */
+#define FSK_BANDWIDTH_DEFAULT      (FSK_BITRATE_DEFAULT + \
+                                   (2 * FSK_FREQ_DEV_DEFAULT))  /**< Bandwidth calculation */
 #endif
 #ifndef FSK_AFC_BANDWIDTH_DEFAULT
-#define FSK_AFC_BANDWIDTH_DEFAULT  (200000UL)                 /**< 20KHz AFC Bandwidth */
+#define FSK_AFC_BANDWIDTH_DEFAULT  (200000UL)                   /**< 20KHz AFC Bandwidth */
 #endif
 #ifndef FSK_PAYLOADLENGTH_DEFAULT
 #define FSK_PAYLOADLENGTH_DEFAULT  (255)                      /**< Default payload length */
