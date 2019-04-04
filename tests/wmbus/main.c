@@ -52,19 +52,10 @@ static char stack[SX127X_STACKSIZE];
 static kernel_pid_t _recv_pid;
 
 static char message[32];
-static uint8_t raw_bytes[290];
+static uint8_t fsk_raw_bytes[290];
 static sx127x_t sx127x;
 
 static uint32_t ps_detector = 0;
-//static uint8_t ps_counter = 0;
-//
-//static volatile int spiTransferState = SPI_TRANSFER_WAIT;
-//
-//static volatile uint8_t spiRxBuffer1[SPI_RX_BUFFER_SIZE];           // RF buffer 1
-//static volatile uint8_t spiRxBuffer2[SPI_RX_BUFFER_SIZE];           // RF buffer 2
-//
-//static volatile uint8_t *spiRxBuffer = spiRxBuffer1;
-//static volatile uint8_t *spiWorkBuffer = spiRxBuffer2;
 
 static const uint32_t ACCESS_CODE = 0b0101010101010000111101u;
 static const uint32_t ACCESS_CODE_BITMASK = 0x3FFFFFu;
@@ -74,6 +65,7 @@ static void _dio1_data_recv(void *arg)
 {
     /* Get interrupt context */
     sx127x_t *dev = (sx127x_t *) arg;
+    printf("DCLK\n");
 
     uint8_t bit = gpio_read(dev->params.dio2_pin);
 
@@ -97,11 +89,12 @@ int fsk_init_cmd(int argc, char **argv)
 
     int res;
 
-    netdev_t *netdev = (netdev_t*) &sx127x;
+    //netdev_t *netdev = (netdev_t*) &sx127x;
 
     sx127x_init_fsk_settings(&sx127x);
 
     if (sx127x.settings.fsk.flags & SX127X_RX_FSK_CONTINUOUS_FLAG) {
+        printf("[main] setting continuous mode...\n");
         res = gpio_init_int(sx127x.params.dio1_pin, GPIO_IN, GPIO_RISING, _dio1_data_recv, &sx127x);
         if (res < 0) {
             printf("[main] error: failed to initialize DIO1 pin\n");
@@ -117,10 +110,10 @@ int fsk_init_cmd(int argc, char **argv)
 
 
     /* Switch to RX state */
-    uint8_t state = NETOPT_STATE_RX;
-    netdev->driver->set(netdev, NETOPT_STATE, &state, sizeof(state));
-
-    printf("Listen mode set\n");
+//    uint8_t state = NETOPT_STATE_RX;
+//    netdev->driver->set(netdev, NETOPT_STATE, &state, sizeof(state));
+//
+//    printf("Listen mode set\n");
 
     return 0;
 }
@@ -424,11 +417,11 @@ static void _event_cb(netdev_t *dev, netdev_event_t event)
                             sx127x_get_time_on_air((const sx127x_t*)dev, len));
                 }
                 else {
-                    dev->driver->recv(dev, raw_bytes, len, &packet_info);
+                    dev->driver->recv(dev, fsk_raw_bytes, len, &packet_info);
                     printf("{Payload: ");
 
                     for (unsigned i = 0; i < len; i++) {
-                        printf("%02X", raw_bytes[i]);
+                        printf("%02X", fsk_raw_bytes[i]);
                     }
                     printf(" (%d bytes), RSSI: %i\n", (int)len, packet_info.rssi);
                 }
