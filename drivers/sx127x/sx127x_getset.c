@@ -124,7 +124,7 @@ void sx127x_set_state(sx127x_t *dev, uint8_t state)
 
 void sx127x_set_modem(sx127x_t *dev, uint8_t modem)
 {
-    DEBUG("[sx127x] set modem: %d\n", modem);
+    DEBUG("[sx127x] set modem: %d\n", modem >> 5);
 
     if ((sx127x_reg_read(dev, SX127X_REG_OPMODE) & SX127X_RF_LORA_OPMODE_LONGRANGEMODE_ON) != 0) {
         dev->settings.modem = SX127X_MODEM_LORA;
@@ -142,16 +142,12 @@ void sx127x_set_modem(sx127x_t *dev, uint8_t modem)
 
     dev->settings.modem = modem;
 
-    sx127x_set_op_mode(dev, SX127X_RF_OPMODE_SLEEP);
-
     switch (dev->settings.modem) {
         case SX127X_MODEM_FSK:
             sx127x_reg_write(dev, SX127X_REG_OPMODE,
                              (sx127x_reg_read(dev, SX127X_REG_OPMODE) &
-                             SX127X_RF_OPMODE_MODULATIONTYPE_FSK));
-
-            sx127x_reg_write(dev, SX127X_REG_DIOMAPPING1, 0x00);
-            sx127x_reg_write(dev, SX127X_REG_DIOMAPPING2, 0x30);
+                              SX127X_RF_OPMODE_MODULATIONTYPE_MASK) |
+                             SX127X_RF_OPMODE_MODULATIONTYPE_FSK);
             break;
         case SX127X_MODEM_LORA:
             sx127x_reg_write(dev, SX127X_REG_OPMODE,
@@ -324,6 +320,25 @@ void sx127x_set_standby(sx127x_t *dev)
     sx127x_set_state(dev,  SX127X_RF_IDLE);
 }
 
+void sx127x_set_rx_trigger(sx127x_t *dev, uint8_t rx_trigger)
+{
+    DEBUG("[sx127x] Set RxTrigger 0x%02X\n", rx_trigger);
+
+    sx127x_reg_write(dev, SX127X_REG_RXCONFIG, ((sx127x_reg_read(dev, SX127X_REG_RXCONFIG) &
+                     SX127X_RF_RXCONFIG_RXTRIGER_MASK) |
+                     rx_trigger));
+}
+
+void sx127x_set_map_preamble_detect(sx127x_t *dev, uint8_t map)
+{
+    DEBUG("[sx127x] Set MapPreambleDetect to 0x%02X\n", map);
+
+    sx127x_reg_write(dev, SX127X_REG_DIOMAPPING2,
+                     (sx127x_reg_read(dev, SX127X_REG_DIOMAPPING2) &
+                     SX127X_RF_DIOMAPPING2_MAP_MASK) |
+                     map);
+}
+
 void sx127x_set_rx(sx127x_t *dev)
 {
     DEBUG("[sx127x] Set RX\n");
@@ -334,77 +349,65 @@ void sx127x_set_rx(sx127x_t *dev)
             if (dev->settings.fsk.flags & SX127X_AFC_ON_FLAG) {
                 sx127x_reg_write(dev, SX127X_REG_RXCONFIG,
                         ((sx127x_reg_read(dev, SX127X_REG_RXCONFIG) &
-                                SX127X_RF_RXCONFIG_RESTARTRXONCOLLISION_MASK) |
-                                SX127X_RF_RXCONFIG_RESTARTRXONCOLLISION_OFF));
-                sx127x_reg_write(dev, SX127X_REG_RXCONFIG,
-                        ((sx127x_reg_read(dev, SX127X_REG_RXCONFIG) &
-                                SX127X_RF_RXCONFIG_AFCAUTO_MASK) |
-                                SX127X_RF_RXCONFIG_AFCAUTO_ON));
-                sx127x_reg_write(dev, SX127X_REG_RXCONFIG,
-                        ((sx127x_reg_read(dev, SX127X_REG_RXCONFIG) &
+                                SX127X_RF_RXCONFIG_RESTARTRXONCOLLISION_MASK &
+                                SX127X_RF_RXCONFIG_AFCAUTO_MASK &
                                 SX127X_RF_RXCONFIG_AGCAUTO_MASK) |
+                                SX127X_RF_RXCONFIG_RESTARTRXONCOLLISION_OFF |
+                                SX127X_RF_RXCONFIG_AFCAUTO_ON |
                                 SX127X_RF_RXCONFIG_AGCAUTO_ON));
             }
             else {
                 sx127x_reg_write(dev, SX127X_REG_RXCONFIG,
-                        ((sx127x_reg_read(dev, SX127X_REG_RXCONFIG) &
-                                SX127X_RF_RXCONFIG_RESTARTRXONCOLLISION_MASK) |
-                                SX127X_RF_RXCONFIG_RESTARTRXONCOLLISION_OFF));
-                sx127x_reg_write(dev, SX127X_REG_RXCONFIG,
-                        ((sx127x_reg_read(dev, SX127X_REG_RXCONFIG) &
-                                SX127X_RF_RXCONFIG_AFCAUTO_MASK) |
-                                SX127X_RF_RXCONFIG_AFCAUTO_OFF));
-                sx127x_reg_write(dev, SX127X_REG_RXCONFIG,
-                        ((sx127x_reg_read(dev, SX127X_REG_RXCONFIG) &
-                                SX127X_RF_RXCONFIG_RESTARTRXONCOLLISION_MASK &
-                                SX127X_RF_RXCONFIG_AGCAUTO_MASK &
-                                SX127X_RF_RXCONFIG_RXTRIGER_MASK) |
-                                SX127X_RF_RXCONFIG_RESTARTRXONCOLLISION_ON |
-                                SX127X_RF_RXCONFIG_AGCAUTO_ON) |
-                                SX127X_RF_RXCONFIG_RXTRIGER_RSSI);
+                                 ((sx127x_reg_read(dev, SX127X_REG_RXCONFIG) &
+                                 SX127X_RF_RXCONFIG_RESTARTRXONCOLLISION_MASK &
+                                 SX127X_RF_RXCONFIG_AFCAUTO_MASK &
+                                 SX127X_RF_RXCONFIG_AGCAUTO_MASK) |
+                                 SX127X_RF_RXCONFIG_RESTARTRXONCOLLISION_OFF |
+                                 SX127X_RF_RXCONFIG_AFCAUTO_OFF |
+                                 SX127X_RF_RXCONFIG_AGCAUTO_ON));
             }
 
-            if ((dev->settings.fsk.flags & SX127X_RX_FSK_CONTINUOUS_FLAG) == false) {
-                sx127x_reg_write(dev, SX127X_REG_DIOMAPPING1,
-                                 (sx127x_reg_read(dev, SX127X_REG_DIOMAPPING1) &
-                                 SX127X_RF_DIOMAPPING1_DIO0_MASK &
-                                 SX127X_RF_DIOMAPPING1_DIO1_MASK &
-                                 SX127X_RF_DIOMAPPING1_DIO2_MASK &
-                                 SX127X_RF_DIOMAPPING1_DIO3_MASK) |
-                                 SX127X_RF_DIOMAPPING1_DIO0_00 |  /* PayloadReady */
-                                 SX127X_RF_DIOMAPPING1_DIO1_00 |  /* FifoLevel */
-                                 SX127X_RF_DIOMAPPING1_DIO2_11 |  /* SyncAddress */
-                                 SX127X_RF_DIOMAPPING1_DIO3_00);  /* FifoEmpty */
-                sx127x_reg_write(dev, SX127X_REG_DIOMAPPING2,
-                                 (sx127x_reg_read(dev, SX127X_REG_DIOMAPPING2) &
-                                 SX127X_RF_DIOMAPPING2_DIO4_MASK &
-                                 SX127X_RF_DIOMAPPING2_DIO5_MASK &
-                                 SX127X_RF_DIOMAPPING2_MAP_MASK) |
-                                 SX127X_RF_DIOMAPPING2_DIO4_11 |            /* PreambleDetect */
-                                 SX127X_RF_DIOMAPPING2_DIO5_11 |            /* ModeReady */
-                                 SX127X_RF_DIOMAPPING2_MAP_PREAMBLEDETECT); /* PreambleDetect */
-            }
-            else {
-                sx127x_reg_write(dev, SX127X_REG_DIOMAPPING1,
-                                 (sx127x_reg_read(dev, SX127X_REG_DIOMAPPING1) &
-                                 SX127X_RF_DIOMAPPING1_DIO0_MASK &
-                                 SX127X_RF_DIOMAPPING1_DIO1_MASK &
-                                 SX127X_RF_DIOMAPPING1_DIO2_MASK &
-                                 SX127X_RF_DIOMAPPING1_DIO3_MASK) |
-                                 SX127X_RF_DIOMAPPING1_DIO0_11 |  /* Disabled */
-                                 SX127X_RF_DIOMAPPING1_DIO1_00 |  /* DClk -> GPIO interrupt must be enabled */
-                                 SX127X_RF_DIOMAPPING1_DIO2_00 |  /* Data -> GPIO interrupt must be disabled */
-                                 SX127X_RF_DIOMAPPING1_DIO3_10);  /* Disabled */
-
-                sx127x_reg_write(dev, SX127X_REG_DIOMAPPING2,
-                                 (sx127x_reg_read(dev, SX127X_REG_DIOMAPPING2) &
-                                 SX127X_RF_DIOMAPPING2_DIO4_MASK &
-                                 SX127X_RF_DIOMAPPING2_DIO5_MASK &
-                                 SX127X_RF_DIOMAPPING2_MAP_MASK) |
-                                 SX127X_RF_DIOMAPPING2_DIO4_00 |            /* ModeReady */
-                                 SX127X_RF_DIOMAPPING2_DIO5_10 |            /* PreambleDetect */
-                                 SX127X_RF_DIOMAPPING2_MAP_RSSI); /* PreambleDetect */
-            }
+//            if ((dev->settings.fsk.flags & SX127X_RX_FSK_CONTINUOUS_FLAG) == false) {
+//                sx127x_reg_write(dev, SX127X_REG_DIOMAPPING1,
+//                                 (sx127x_reg_read(dev, SX127X_REG_DIOMAPPING1) &
+//                                 SX127X_RF_DIOMAPPING1_DIO0_MASK &
+//                                 SX127X_RF_DIOMAPPING1_DIO1_MASK &
+//                                 SX127X_RF_DIOMAPPING1_DIO2_MASK &
+//                                 SX127X_RF_DIOMAPPING1_DIO3_MASK) |
+//                                 SX127X_RF_DIOMAPPING1_DIO0_00 |  /* PayloadReady */
+//                                 SX127X_RF_DIOMAPPING1_DIO1_00 |  /* FifoLevel */
+//                                 SX127X_RF_DIOMAPPING1_DIO2_11 |  /* SyncAddress */
+//                                 SX127X_RF_DIOMAPPING1_DIO3_00);  /* FifoEmpty */
+//                sx127x_reg_write(dev, SX127X_REG_DIOMAPPING2,
+//                                 (sx127x_reg_read(dev, SX127X_REG_DIOMAPPING2) &
+//                                 SX127X_RF_DIOMAPPING2_DIO4_MASK &
+//                                 SX127X_RF_DIOMAPPING2_DIO5_MASK &
+//                                 SX127X_RF_DIOMAPPING2_MAP_MASK) |
+//                                 SX127X_RF_DIOMAPPING2_DIO4_11 |            /* PreambleDetect */
+//                                 SX127X_RF_DIOMAPPING2_DIO5_11 |            /* ModeReady */
+//                                 SX127X_RF_DIOMAPPING2_MAP_PREAMBLEDETECT); /* PreambleDetect */
+//            }
+//            else {
+//                sx127x_reg_write(dev, SX127X_REG_DIOMAPPING1,
+//                                 (sx127x_reg_read(dev, SX127X_REG_DIOMAPPING1) &
+//                                 SX127X_RF_DIOMAPPING1_DIO0_MASK &
+//                                 SX127X_RF_DIOMAPPING1_DIO1_MASK &
+//                                 SX127X_RF_DIOMAPPING1_DIO2_MASK &
+//                                 SX127X_RF_DIOMAPPING1_DIO3_MASK) |
+//                                 SX127X_RF_DIOMAPPING1_DIO0_11 |  /* Disabled */
+//                                 SX127X_RF_DIOMAPPING1_DIO1_00 |  /* DClk -> GPIO interrupt must be enabled */
+//                                 SX127X_RF_DIOMAPPING1_DIO2_00 |  /* Data -> GPIO interrupt must be disabled */
+//                                 SX127X_RF_DIOMAPPING1_DIO3_10);  /* Disabled */
+//
+//                sx127x_reg_write(dev, SX127X_REG_DIOMAPPING2,
+//                                 (sx127x_reg_read(dev, SX127X_REG_DIOMAPPING2) &
+//                                 SX127X_RF_DIOMAPPING2_DIO4_MASK &
+//                                 SX127X_RF_DIOMAPPING2_DIO5_MASK &
+//                                 SX127X_RF_DIOMAPPING2_MAP_MASK) |
+//                                 SX127X_RF_DIOMAPPING2_DIO4_00 |            /* ModeReady */
+//                                 SX127X_RF_DIOMAPPING2_DIO5_10 |            /* PreambleDetect */
+//                                 SX127X_RF_DIOMAPPING2_MAP_RSSI); /* PreambleDetect */
+//            }
 
         }
         sx127x_set_op_mode(dev, SX127X_RF_OPMODE_RECEIVER);
@@ -1113,8 +1116,8 @@ void sx127x_set_fsk_mod_shaping(sx127x_t *dev, uint8_t mode)
 {
     DEBUG("[sx127x] Set modulation shaping: 0x%02x\n", mode);
     dev->settings.fsk.mod_shaping = mode;
-    sx127x_reg_write(dev, SX127X_REG_PARAMP,
-                     (sx127x_reg_read(dev, SX127X_REG_PARAMP) &
+    sx127x_reg_write(dev, SX127X_REG_OPMODE,
+                     (sx127x_reg_read(dev, SX127X_REG_OPMODE) &
                       SX127X_RF_PARAMP_MODULATIONSHAPING_MASK) | mode);
 }
 
@@ -1134,24 +1137,28 @@ void sx127x_set_lna(sx127x_t *dev, uint8_t value)
 
 void sx127x_set_syncconfig(sx127x_t *dev, uint8_t autorestart_rx_mode,
                            uint8_t preamble_polarity, uint8_t sync,
-                           uint8_t sync_size)
+                           uint8_t fifo_fill_cond, uint8_t sync_size)
 {
-    DEBUG("[sx127x] Set autorestart rx mode: 0x%02x\n"
-          "[sx127x] Set preamble polarity: 0x%02x\n"
-          "[sx127x] Set sync: 0x%02x\n"
-          "[sx127x] Set sync size: 0x%02x\n",
-          autorestart_rx_mode,
-                   preamble_polarity,
-                   sync,
-                   sync_size);
+    DEBUG("[sx127x] Set autorestart rx mode: 0x%02X\n"
+          "[sx127x] Set preamble polarity: 0x%02X\n"
+          "[sx127x] Set sync: 0x%02X\n"
+          "[sx127x] Set FifoFillCondition: 0x%02X\n"
+          "[sx127x] Set sync size: 0x%02X\n",
+          autorestart_rx_mode >> 6,
+          preamble_polarity >> 5,
+          sync >> 4,
+          fifo_fill_cond >> 3,
+          sync_size);
     dev->settings.fsk.sysconfig = (sx127x_reg_read(dev, SX127X_REG_SYNCCONFIG) &
                                   SX127X_RF_SYNCCONFIG_AUTORESTARTRXMODE_MASK &
                                   SX127X_RF_SYNCCONFIG_PREAMBLEPOLARITY_MASK &
                                   SX127X_RF_SYNCCONFIG_SYNC_MASK &
+                                  SX127X_RF_SYNCCONFIG_FIFOFILL_MASK &
                                   SX127X_RF_SYNCCONFIG_SYNCSIZE_MASK) |
                                   autorestart_rx_mode |
                                   preamble_polarity |
                                   sync |
+                                  fifo_fill_cond |
                                   sync_size;
 
     sx127x_reg_write(dev, SX127X_REG_SYNCCONFIG, dev->settings.fsk.sysconfig);
@@ -1222,7 +1229,7 @@ void sx127x_set_packetconfig2(sx127x_t *dev, uint8_t wmbus_crc_enable, uint8_t d
                    io_home,
                    beacon);
 
-    if (data_mode == SX127X_RF_PACKETCONFIG2_DATAMODE_CONTINUOUS) {
+    /*if (data_mode == SX127X_RF_PACKETCONFIG2_DATAMODE_CONTINUOUS) {
         _set_flag(dev, SX127X_RX_FSK_CONTINUOUS_FLAG, true);
         gpio_irq_disable(dev->params.dio1_pin);
         gpio_irq_disable(dev->params.dio2_pin);
@@ -1231,7 +1238,7 @@ void sx127x_set_packetconfig2(sx127x_t *dev, uint8_t wmbus_crc_enable, uint8_t d
     else {
         _set_flag(dev, SX127X_RX_FSK_CONTINUOUS_FLAG, false);
         sx127x_config_dio(dev, dev->params.dio2_pin, GPIO_IN, GPIO_RISING, 2, true);
-    }
+    }*/
 
     dev->settings.fsk.pktconfig2 = (sx127x_reg_read(dev, SX127X_REG_PACKETCONFIG2) &
                                     SX127X_RF_PACKETCONFIG2_WMBUS_CRC_ENABLE_MASK &
@@ -1244,6 +1251,36 @@ void sx127x_set_packetconfig2(sx127x_t *dev, uint8_t wmbus_crc_enable, uint8_t d
                                     beacon;
 
     sx127x_reg_write(dev, SX127X_REG_PACKETCONFIG2, dev->settings.fsk.pktconfig2);
+}
+
+void sx127x_set_dio_mapping1(sx127x_t *dev, uint8_t dio0, uint8_t dio1,
+                             uint8_t dio2, uint8_t dio3)
+{
+    DEBUG("[sx127x] Setting DIO 1 to: 0x%02x\n", dio0 >> 6);
+    DEBUG("[sx127x] Setting DIO 2 to: 0x%02x\n", dio1 >> 4);
+    DEBUG("[sx127x] Setting DIO 3 to: 0x%02x\n", dio2 >> 2);
+    DEBUG("[sx127x] Setting DIO 4 to: 0x%02x\n", dio3);
+
+    sx127x_reg_write(dev, SX127X_REG_DIOMAPPING1, (sx127x_reg_read(dev, SX127X_REG_DIOMAPPING1) &
+                     SX127X_RF_DIOMAPPING1_DIO0_MASK &
+                     SX127X_RF_DIOMAPPING1_DIO1_MASK &
+                     SX127X_RF_DIOMAPPING1_DIO2_MASK &
+                     SX127X_RF_DIOMAPPING1_DIO3_MASK) |
+                     dio0 |
+                     dio1 |
+                     dio2 |
+                     dio3);
+}
+
+void sx127x_set_dio_mapping2(sx127x_t *dev, uint8_t dio4, uint8_t dio5)
+{
+    DEBUG("[sx127x] Setting DIO 4 to: 0x%02x\n", dio4 >> 6);
+    DEBUG("[sx127x] Setting DIO 5 to: 0x%02x\n", dio5 >> 4);
+    sx127x_reg_write(dev, SX127X_REG_DIOMAPPING2, (sx127x_reg_read(dev, SX127X_REG_DIOMAPPING2) &
+                         SX127X_RF_DIOMAPPING2_DIO4_MASK &
+                         SX127X_RF_DIOMAPPING2_DIO5_MASK) |
+                         dio4 |
+                         dio5);
 }
 
 uint8_t sx127x_get_packetconfig2(const sx127x_t *dev)

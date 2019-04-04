@@ -755,7 +755,7 @@ void sx127x_set_lna(sx127x_t *dev, uint8_t value);
 uint8_t sx127x_get_lna(const sx127x_t *dev);
 void sx127x_set_syncconfig(sx127x_t *dev, uint8_t autorestart_rx_mode,
                            uint8_t preamble_polarity, uint8_t sync,
-                           uint8_t sync_size);
+                           uint8_t fifo_fill_cond, uint8_t sync_size);
 void sx127x_set_packetconfig1(sx127x_t *dev, uint8_t packet_format, uint8_t dcfree,
                               uint8_t crc, uint8_t crc_autoclear, uint8_t addrs_filtering,
                               uint8_t crc_whitening_type);
@@ -778,6 +778,11 @@ void sx127x_fsk_set_preamble_detector_tol(sx127x_t *dev, uint8_t value);
 void sx127x_fsk_set_syncword(sx127x_t *dev, uint8_t syncword, uint8_t value);
 int sx127x_config_dio(sx127x_t *dev, gpio_t pin, gpio_mode_t mode,
                       gpio_flank_t flank, uint8_t dio, bool is_int);
+void sx127x_set_dio_mapping1(sx127x_t *dev, uint8_t dio0, uint8_t dio1,
+                             uint8_t dio2, uint8_t dio3);
+void sx127x_set_dio_mapping2(sx127x_t *dev, uint8_t dio4, uint8_t dio5);
+void sx127x_set_rx_trigger(sx127x_t *dev, uint8_t rx_trigger);
+void sx127x_set_map_preamble_detect(sx127x_t *dev, uint8_t map);
 
 #ifdef __cplusplus
 }

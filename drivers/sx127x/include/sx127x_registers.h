@@ -1151,6 +1151,10 @@ extern "C" {
 #define SX127X_RF_SYNCCONFIG_SYNC_ON                                 (0x10)  /* Default */
 #define SX127X_RF_SYNCCONFIG_SYNC_OFF                                (0x00)
 
+#define SX127X_RF_SYNCCONFIG_FIFOFILL_MASK                           (0xF7)
+#define SX127X_RF_SYNCCONFIG_FIFOFILL_SYNCADDR                       (0x00)  /* Default */
+#define SX127X_RF_SYNCCONFIG_FIFOFILL_FIFOFILL                       (0x08)
+
 #define SX127X_RF_SYNCCONFIG_SYNCSIZE_MASK                           (0xF8)
 #define SX127X_RF_SYNCCONFIG_SYNCSIZE_1                              (0x00)
 #define SX127X_RF_SYNCCONFIG_SYNCSIZE_2                              (0x01)
