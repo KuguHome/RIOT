@@ -343,7 +343,7 @@ static int _init(netdev_t *netdev)
         sx127x_init_lora_settings(sx127x);
     }
     else {
-        sx127x_init_fsk_settings(sx127x);
+        sx127x_init_fsk_settings(sx127x, SX127X_FSK_PACKET_MODE);
     }
 
     /* Put chip into sleep */
@@ -721,7 +721,8 @@ void _on_dio0_irq(void *arg)
             if ((dev->settings.fsk.flags & SX127X_RX_FSK_CONTINUOUS_FLAG) == false) {
                 DEBUG("[sx127x] netdev: sx127x_on_dio0 -> PayloadReady\n");
                 /* In packet mode this should mean a good payload is ready */
-                netdev->event_callback(netdev, NETDEV_EVENT_RX_COMPLETE);
+                uint8_t state = NETOPT_STATE_RX;
+                netdev->driver->set(netdev, NETOPT_STATE, &state, sizeof(state));
             }
             else {
                 DEBUG("[sx127x] netdev: dio0 -> SyncAddress\n");
@@ -774,7 +775,7 @@ void _on_dio1_irq(void *arg)
                     if ((dev->settings.fsk.flags & SX127X_RX_FSK_CONTINUOUS_FLAG) == false) {
                         DEBUG("[sx127x] netdev: sx127x_on_dio1 -> FifoLevel\n");
                         /* FifoLevel interrupt, some payload is available */
-                        //netdev->event_callback(netdev, NETDEV_EVENT_RX_COMPLETE);
+                        netdev->event_callback(netdev, NETDEV_EVENT_RX_COMPLETE);
                     }
                     else {
 

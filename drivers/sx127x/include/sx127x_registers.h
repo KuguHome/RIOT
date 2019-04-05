@@ -907,8 +907,10 @@ extern "C" {
 #define SX127X_RF_RXCONFIG_RESTARTRXONCOLLISION_ON                   (0x80)
 #define SX127X_RF_RXCONFIG_RESTARTRXONCOLLISION_OFF                  (0x00) /* Default */
 
+#define SX127X_RF_RXCONFIG_RESTARTRXWITHOUTPLLLOCK_MASK              (0xBF)
 #define SX127X_RF_RXCONFIG_RESTARTRXWITHOUTPLLLOCK                   (0x40) /* Write only */
 
+#define SX127X_RF_RXCONFIG_RESTARTRXWITHPLLLOCK_MASK                 (0xDF)
 #define SX127X_RF_RXCONFIG_RESTARTRXWITHPLLLOCK                      (0x20) /* Write only */
 
 #define SX127X_RF_RXCONFIG_AFCAUTO_MASK                              (0xEF)

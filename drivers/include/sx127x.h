@@ -166,6 +166,11 @@ enum {
     SX127X_PA_BOOST,                   /**< Power amplifier boost (high power) */
 };
 
+enum {
+    SX127X_FSK_PACKET_MODE = 0,
+    SX127X_FSK_CONTINUOUS_MODE,
+};
+
 /**
  * @name    SX127X LoRa descriptor boolean flags
  * @{
@@ -334,8 +339,9 @@ void sx127x_init_lora_settings(sx127x_t *dev);
  * @brief   Initialize FSK settings with default values
  *
  * @param[in] dev                      The sx127x device pointer
+ * @param[in] mode                     Either Packet or Continuous mode
  */
-void sx127x_init_fsk_settings(sx127x_t *dev);
+void sx127x_init_fsk_settings(sx127x_t *dev, uint8_t mode);
 
 /**
  * @brief   Generates 32 bits random value based on the RSSI readings
