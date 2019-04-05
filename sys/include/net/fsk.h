@@ -52,7 +52,7 @@ extern "C" {
 #define FSK_BITRATE_DEFAULT        (32768UL)                   /**< Bitrate at 100kpbs */
 #endif
 #ifndef FSK_FREQ_DEV_DEFAULT
-#define FSK_FREQ_DEV_DEFAULT       (50000UL)                    /**< 50KHz frequency deviation */
+#define FSK_FREQ_DEV_DEFAULT       (38000UL)                    /**< 50KHz frequency deviation */
 #endif
 #ifndef FSK_BANDWIDTH_DEFAULT
 #define FSK_BANDWIDTH_DEFAULT      (FSK_BITRATE_DEFAULT + \
