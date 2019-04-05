@@ -65,33 +65,46 @@ static void _dio1_data_recv(void *arg)
 {
     /* Get interrupt context */
     sx127x_t *dev = (sx127x_t *) arg;
-    printf("DCLK\n");
 
     uint8_t bit = gpio_read(dev->params.dio2_pin);
+
+    if (bit) {
+        puts("Got something!");
+    }
 
     ps_detector = (ps_detector << 1) | bit;
 
     if ((ps_detector & ACCESS_CODE_BITMASK) == ACCESS_CODE) {
         printf("[main] preamble + sync word detected!\n");
     }
-    else {
-        if (ps_detector > 0) {
+    else if (ps_detector > 0) {
             printf("0x%08lx\n", ps_detector);
-        }
     }
-
 }
 
 int fsk_init_cmd(int argc, char **argv)
 {
-    (void)argc;
-    (void)argv;
-
     int res;
 
     //netdev_t *netdev = (netdev_t*) &sx127x;
+    if (argc < 1) {
+        puts("Usage: init_fsk <mode (packet, continuous)>");
+        return -1;
+    }
 
-    sx127x_init_fsk_settings(&sx127x);
+    if (strstr(argv[1], "continuous") != NULL) {
+        puts("Initialising FSK modem in continuous mode");
+        sx127x_init_fsk_settings(&sx127x, SX127X_FSK_CONTINUOUS_MODE);
+    }
+    else if (strstr(argv[1], "packet") != NULL) {
+        puts("Initialising FSK modem in packet mode");
+        sx127x_init_fsk_settings(&sx127x, SX127X_FSK_PACKET_MODE);
+    }
+    else {
+        puts("Usage: init_fsk <mode (packet, continuous)>");
+        return -1;
+    }
+
 
     if (sx127x.settings.fsk.flags & SX127X_RX_FSK_CONTINUOUS_FLAG) {
         printf("[main] setting continuous mode...\n");
@@ -193,7 +206,7 @@ int random_cmd(int argc, char **argv)
 
     /* reinit the transceiver to default values */
     if (sx127x.settings.modem == SX127X_MODEM_FSK) {
-        sx127x_init_fsk_settings((sx127x_t*) netdev);
+        sx127x_init_fsk_settings((sx127x_t*) netdev, SX127X_FSK_CONTINUOUS_MODE);
     }
     else {
         sx127x_init_lora_settings((sx127x_t*) netdev);
