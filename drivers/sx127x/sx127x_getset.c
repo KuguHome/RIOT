@@ -363,58 +363,16 @@ void sx127x_set_rx(sx127x_t *dev)
                 sx127x_reg_write(dev, SX127X_REG_RXCONFIG,
                                  ((sx127x_reg_read(dev, SX127X_REG_RXCONFIG) &
                                  SX127X_RF_RXCONFIG_RESTARTRXONCOLLISION_MASK &
-                                 SX127X_RF_RXCONFIG_RESTARTRXWITHPLLLOCK_MASK &
+                                 SX127X_RF_RXCONFIG_RESTARTRXWITHOUTPLLLOCK_MASK &
                                  SX127X_RF_RXCONFIG_AFCAUTO_MASK &
                                  SX127X_RF_RXCONFIG_AGCAUTO_MASK) |
                                  SX127X_RF_RXCONFIG_RESTARTRXONCOLLISION_ON |
-                                 SX127X_RF_RXCONFIG_RESTARTRXWITHPLLLOCK |
+                                 SX127X_RF_RXCONFIG_RESTARTRXWITHOUTPLLLOCK |
                                  SX127X_RF_RXCONFIG_AFCAUTO_OFF |
                                  SX127X_RF_RXCONFIG_AGCAUTO_ON));
             }
-
-//            if ((dev->settings.fsk.flags & SX127X_RX_FSK_CONTINUOUS_FLAG) == false) {
-//                sx127x_reg_write(dev, SX127X_REG_DIOMAPPING1,
-//                                 (sx127x_reg_read(dev, SX127X_REG_DIOMAPPING1) &
-//                                 SX127X_RF_DIOMAPPING1_DIO0_MASK &
-//                                 SX127X_RF_DIOMAPPING1_DIO1_MASK &
-//                                 SX127X_RF_DIOMAPPING1_DIO2_MASK &
-//                                 SX127X_RF_DIOMAPPING1_DIO3_MASK) |
-//                                 SX127X_RF_DIOMAPPING1_DIO0_00 |  /* PayloadReady */
-//                                 SX127X_RF_DIOMAPPING1_DIO1_00 |  /* FifoLevel */
-//                                 SX127X_RF_DIOMAPPING1_DIO2_11 |  /* SyncAddress */
-//                                 SX127X_RF_DIOMAPPING1_DIO3_00);  /* FifoEmpty */
-//                sx127x_reg_write(dev, SX127X_REG_DIOMAPPING2,
-//                                 (sx127x_reg_read(dev, SX127X_REG_DIOMAPPING2) &
-//                                 SX127X_RF_DIOMAPPING2_DIO4_MASK &
-//                                 SX127X_RF_DIOMAPPING2_DIO5_MASK &
-//                                 SX127X_RF_DIOMAPPING2_MAP_MASK) |
-//                                 SX127X_RF_DIOMAPPING2_DIO4_11 |            /* PreambleDetect */
-//                                 SX127X_RF_DIOMAPPING2_DIO5_11 |            /* ModeReady */
-//                                 SX127X_RF_DIOMAPPING2_MAP_PREAMBLEDETECT); /* PreambleDetect */
-//            }
-//            else {
-//                sx127x_reg_write(dev, SX127X_REG_DIOMAPPING1,
-//                                 (sx127x_reg_read(dev, SX127X_REG_DIOMAPPING1) &
-//                                 SX127X_RF_DIOMAPPING1_DIO0_MASK &
-//                                 SX127X_RF_DIOMAPPING1_DIO1_MASK &
-//                                 SX127X_RF_DIOMAPPING1_DIO2_MASK &
-//                                 SX127X_RF_DIOMAPPING1_DIO3_MASK) |
-//                                 SX127X_RF_DIOMAPPING1_DIO0_11 |  /* Disabled */
-//                                 SX127X_RF_DIOMAPPING1_DIO1_00 |  /* DClk -> GPIO interrupt must be enabled */
-//                                 SX127X_RF_DIOMAPPING1_DIO2_00 |  /* Data -> GPIO interrupt must be disabled */
-//                                 SX127X_RF_DIOMAPPING1_DIO3_10);  /* Disabled */
-//
-//                sx127x_reg_write(dev, SX127X_REG_DIOMAPPING2,
-//                                 (sx127x_reg_read(dev, SX127X_REG_DIOMAPPING2) &
-//                                 SX127X_RF_DIOMAPPING2_DIO4_MASK &
-//                                 SX127X_RF_DIOMAPPING2_DIO5_MASK &
-//                                 SX127X_RF_DIOMAPPING2_MAP_MASK) |
-//                                 SX127X_RF_DIOMAPPING2_DIO4_00 |            /* ModeReady */
-//                                 SX127X_RF_DIOMAPPING2_DIO5_10 |            /* PreambleDetect */
-//                                 SX127X_RF_DIOMAPPING2_MAP_RSSI); /* PreambleDetect */
-//            }
-
         }
+
         sx127x_set_op_mode(dev, SX127X_RF_OPMODE_RECEIVER);
         break;
         case SX127X_MODEM_LORA:

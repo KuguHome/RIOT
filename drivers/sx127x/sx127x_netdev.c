@@ -204,8 +204,8 @@ static int _recv(netdev_t *netdev, void *buf, size_t len, void *info)
             }
             else {
                 if ((dev->settings.fsk.flags & SX127X_RX_FSK_CONTINUOUS_FLAG) == false) {
-                    DEBUG("[sx127x] netdev: Packet mode -> going IDLE\n");
-                    sx127x_set_standby(dev);
+                    //DEBUG("[sx127x] netdev: Packet mode -> going IDLE\n");
+                    //sx127x_set_standby(dev);
                 }
                 else {
                     /* Restart RX */
@@ -213,12 +213,15 @@ static int _recv(netdev_t *netdev, void *buf, size_t len, void *info)
                                      sx127x_reg_read(dev, SX127X_REG_RXCONFIG) |
                                      SX127X_RF_RXCONFIG_RESTARTRXWITHOUTPLLLOCK);
                 }
-                sx127x_read_fifo(dev, buf + dev->settings.fsk.pkt_handler.nb_bytes,
-                                 dev->settings.fsk.pkt_handler.size -
-                                 dev->settings.fsk.pkt_handler.nb_bytes);
 
-                dev->settings.fsk.pkt_handler.nb_bytes += (dev->settings.fsk.pkt_handler.size -
-                                                           dev->settings.fsk.pkt_handler.nb_bytes);
+                while (!(sx127x_reg_read(dev, SX127X_REG_IRQFLAGS2) & SX127X_RF_IRQFLAGS2_FIFOEMPTY)) {
+                    sx127x_read_fifo(dev, buf + dev->settings.fsk.pkt_handler.nb_bytes,
+                            dev->settings.fsk.pkt_handler.size -
+                            dev->settings.fsk.pkt_handler.nb_bytes);
+
+                    dev->settings.fsk.pkt_handler.nb_bytes += (dev->settings.fsk.pkt_handler.size -
+                            dev->settings.fsk.pkt_handler.nb_bytes);
+                }
             }
 
             netdev_sx127x_packet_info_t *packet_info = info;
@@ -886,8 +889,8 @@ void _on_dio3_irq(void *arg)
             if ((dev->settings.fsk.flags & SX127X_RX_FSK_CONTINUOUS_FLAG) == false) {
                 DEBUG("[sx127x] netdev: sx127x_on_dio3 -> FifoEmpty\n");
                 /* FifoEmpty interrupt, switch to RX state */
-                uint8_t state = NETOPT_STATE_RX;
-                netdev->driver->set(netdev, NETOPT_STATE, &state, sizeof(state));
+                /*uint8_t state = NETOPT_STATE_RX;
+                netdev->driver->set(netdev, NETOPT_STATE, &state, sizeof(state));*/
             }
             else {
                 /* TempChange/LowBat -> nothing to do... */
@@ -918,10 +921,15 @@ void _on_dio4_irq(void *arg)
 
     switch (dev->settings.modem) {
         case SX127X_MODEM_FSK:
-            /* PreambleDetected interrupt, only available in fixed packet length mode */
-            if ((dev->settings.fsk.flags & SX127X_PREAMBLE_DETECTED_FLAG) == false) {
-                DEBUG("[sx127x] netdev: sx127x_on_dio4 -> PreambleDetected\n");
-                dev->settings.fsk.flags |= SX127X_PREAMBLE_DETECTED_FLAG;
+            if ((dev->settings.fsk.flags & SX127X_RX_FSK_CONTINUOUS_FLAG) == false) {
+                /* PreambleDetected interrupt, only available in fixed packet length mode */
+                if ((dev->settings.fsk.flags & SX127X_PREAMBLE_DETECTED_FLAG) == false) {
+                    DEBUG("[sx127x] netdev: sx127x_on_dio4 -> PreambleDetected\n");
+                    dev->settings.fsk.flags |= SX127X_PREAMBLE_DETECTED_FLAG;
+                }
+            }
+            else {
+                DEBUG("[sx127x] netdev: sx127x_on_dio4 -> ModeReady\n");
             }
             break;
         case SX127X_MODEM_LORA:
