@@ -46,8 +46,6 @@
 
 #define MSG_TYPE_ISR            (0x3456)
 
-#define SPI_RX_BUFFER_SIZE      64                                  // Define the payload size here
-
 static char stack[SX127X_STACKSIZE];
 static kernel_pid_t _recv_pid;
 
