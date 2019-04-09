@@ -64,6 +64,8 @@ static void _dio1_data_recv(void *arg)
     /* Get interrupt context */
     sx127x_t *dev = (sx127x_t *) arg;
 
+//    puts("DCLK");
+
     uint8_t bit = gpio_read(dev->params.dio2_pin);
 
     if (bit) {
