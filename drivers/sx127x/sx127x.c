@@ -211,15 +211,17 @@ void sx127x_init_fsk_settings(sx127x_t *dev, uint8_t mode)
                               SX127X_RF_SYNCCONFIG_PREAMBLEPOLARITY_AA,
                               SX127X_RF_SYNCCONFIG_SYNC_ON,
                               SX127X_RF_SYNCCONFIG_FIFOFILL_SYNCADDR,
-                              SX127X_RF_SYNCCONFIG_SYNCSIZE_3);
+                              SX127X_RF_SYNCCONFIG_SYNCSIZE_2);
+        sx127x_fsk_set_syncword(dev, FSK_SYNCWORD_SYNCVALUE1, 1);
+        sx127x_fsk_set_syncword(dev, FSK_SYNCWORD_SYNCVALUE2, 2);
         sx127x_set_packetconfig2(dev, SX127X_RF_PACKETCONFIG2_WMBUS_CRC_DISABLE,
                                  SX127X_RF_PACKETCONFIG2_DATAMODE_CONTINUOUS,
                                  SX127X_RF_PACKETCONFIG2_IOHOME_OFF,
                                  SX127X_RF_PACKETCONFIG2_BEACON_OFF);
-        sx127x_set_dio_mapping1(dev, SX127X_RF_DIOMAPPING1_DIO0_11, /* Disabled */
+        sx127x_set_dio_mapping1(dev, SX127X_RF_DIOMAPPING1_DIO0_00, /* SyncAddress */
                                 SX127X_RF_DIOMAPPING1_DIO1_00,      /* DClk -> GPIO interrupt must be enabled */
                                 SX127X_RF_DIOMAPPING1_DIO2_11,      /* Data -> GPIO interrupt must be disabled */
-                                SX127X_RF_DIOMAPPING1_DIO3_11);     /* TempChange / LowBat */
+                                SX127X_RF_DIOMAPPING1_DIO3_01);     /* RSSI/PreambleDetected */
         sx127x_set_dio_mapping2(dev, SX127X_RF_DIOMAPPING2_DIO4_11, /* ModeReady */
                                 SX127X_RF_DIOMAPPING2_DIO5_11);     /* ModeReady */
         break;

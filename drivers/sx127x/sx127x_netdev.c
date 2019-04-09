@@ -342,12 +342,12 @@ static int _init(netdev_t *netdev)
     }
 
     /* Configure radio according to the requested mode */
-    if(settings.modem == SX127X_MODEM_LORA) {
-        sx127x_init_lora_settings(sx127x);
-    }
-    else {
+//    if(settings.modem == SX127X_MODEM_LORA) {
+//        sx127x_init_lora_settings(sx127x);
+//    }
+//    else {
         sx127x_init_fsk_settings(sx127x, SX127X_FSK_PACKET_MODE);
-    }
+//    }
 
     /* Put chip into sleep */
     sx127x_set_sleep(sx127x);
@@ -893,7 +893,11 @@ void _on_dio3_irq(void *arg)
                 netdev->driver->set(netdev, NETOPT_STATE, &state, sizeof(state));*/
             }
             else {
-                /* TempChange/LowBat -> nothing to do... */
+                /* PreambleDetected interrupt, only available in fixed packet length mode */
+                if ((dev->settings.fsk.flags & SX127X_PREAMBLE_DETECTED_FLAG) == false) {
+                    DEBUG("[sx127x] netdev: sx127x_on_dio4 -> PreambleDetected\n");
+                    dev->settings.fsk.flags |= SX127X_PREAMBLE_DETECTED_FLAG;
+                }
             }
             break;
         case SX127X_MODEM_LORA:
