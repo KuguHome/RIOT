@@ -842,3 +842,8 @@ endif
 ifneq (,$(filter ecc_%,$(USEMODULE)))
   USEMODULE += ecc
 endif
+
+ifneq (,$(filter wmbus_decoder,$(USEMODULE)))
+  USEMODULE += checksum
+  USEMODULE += three_out_of_six
+endif

@@ -136,7 +136,9 @@ endif
 ifneq (,$(filter bluetil_%,$(USEMODULE)))
   DIRS += net/ble/bluetil
 endif
-
+ifneq (,$(filter wmbus_decoder,$(USEMODULE)))
+  DIRS += net/application_layer/wmbus
+endif
 DIRS += $(dir $(wildcard $(addsuffix /Makefile, $(USEMODULE))))
 
 include $(RIOTBASE)/Makefile.base
