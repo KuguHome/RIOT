@@ -171,7 +171,7 @@ void sx127x_init_fsk_settings(sx127x_t *dev, uint8_t mode)
     sx127x_set_tx_power(dev, 14);
 #endif
     sx127x_set_lna(dev, SX127X_RF_LNA_GAIN_G1);
-    sx127x_fsk_set_afc(dev, false);
+    sx127x_fsk_set_afc(dev, true);
     sx127x_set_packetconfig1(dev, SX127X_RF_PACKETCONFIG1_PACKETFORMAT_VARIABLE,
                              SX127X_RF_PACKETCONFIG1_DCFREE_OFF,
                              SX127X_RF_PACKETCONFIG1_CRC_ON,
@@ -188,8 +188,8 @@ void sx127x_init_fsk_settings(sx127x_t *dev, uint8_t mode)
                               SX127X_RF_SYNCCONFIG_SYNCSIZE_2);
         sx127x_fsk_set_syncword(dev, FSK_SYNCWORD_SYNCVALUE1, 1);
         sx127x_fsk_set_syncword(dev, FSK_SYNCWORD_SYNCVALUE2, 2);
-        sx127x_set_payload_length(dev, 0);
-        sx127x_set_fsk_mod_shaping(dev, SX127X_RF_OPMODE_MODULATIONSHAPING_10);
+        sx127x_set_payload_length(dev, FSK_PAYLOADLENGTH_DEFAULT);
+//        sx127x_set_fsk_mod_shaping(dev, SX127X_RF_OPMODE_MODULATIONSHAPING_10);
         sx127x_reg_write(dev, SX127X_REG_FIFOTHRESH,
                          ((sx127x_reg_read(dev, SX127X_REG_FIFOTHRESH) &
                          SX127X_RF_FIFOTHRESH_FIFOTHRESHOLD_MASK) |
@@ -233,7 +233,7 @@ void sx127x_init_fsk_settings(sx127x_t *dev, uint8_t mode)
     }
 
     sx127x_fsk_set_preamble_detect(dev, SX127X_RF_PREAMBLEDETECT_DETECTOR_ON);
-    sx127x_fsk_set_preamble_detector_size(dev, SX127X_RF_PREAMBLEDETECT_DETECTORSIZE_2);
+    sx127x_fsk_set_preamble_detector_size(dev, SX127X_RF_PREAMBLEDETECT_DETECTORSIZE_1);
     sx127x_fsk_set_preamble_detector_tol(dev, SX127X_RF_PREAMBLEDETECT_DETECTORTOL_10);
     sx127x_set_rx_trigger(dev, SX127X_RF_RXCONFIG_RXTRIGER_PREAMBLEDETECT);
     sx127x_set_map_preamble_detect(dev, SX127X_RF_DIOMAPPING2_MAP_PREAMBLEDETECT);

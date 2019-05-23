@@ -889,8 +889,8 @@ void _on_dio3_irq(void *arg)
             if ((dev->settings.fsk.flags & SX127X_RX_FSK_CONTINUOUS_FLAG) == false) {
                 DEBUG("[sx127x] netdev: sx127x_on_dio3 -> FifoEmpty\n");
                 /* FifoEmpty interrupt, switch to RX state */
-                /*uint8_t state = NETOPT_STATE_RX;
-                netdev->driver->set(netdev, NETOPT_STATE, &state, sizeof(state));*/
+                uint8_t state = NETOPT_STATE_RX;
+                netdev->driver->set(netdev, NETOPT_STATE, &state, sizeof(state));
             }
             else {
                 /* PreambleDetected interrupt, only available in fixed packet length mode */
