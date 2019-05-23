@@ -54,9 +54,10 @@ static uint8_t fsk_raw_bytes[290];
 static sx127x_t sx127x;
 
 static uint32_t ps_detector = 0;
+static uint8_t data = 0;
 
-static const uint32_t ACCESS_CODE = 0b0101010101010000111101u;
-static const uint32_t ACCESS_CODE_BITMASK = 0x3FFFFFu;
+static const uint32_t ACCESS_CODE = 0b0101010101010000111101U;
+static const uint32_t ACCESS_CODE_BITMASK = 0x3FFFFFU;
 
 
 static void _dio1_data_recv(void *arg)
@@ -68,17 +69,15 @@ static void _dio1_data_recv(void *arg)
 
     uint8_t bit = gpio_read(dev->params.dio2_pin);
 
-    if (bit) {
-        puts("Got something!");
-    }
+//    if (bit) {
+//        puts("Got something!");
+//    }
 
     ps_detector = (ps_detector << 1) | bit;
 
     if ((ps_detector & ACCESS_CODE_BITMASK) == ACCESS_CODE) {
+        ps_detector = 0;
         printf("[main] preamble + sync word detected!\n");
-    }
-    else if (ps_detector > 0) {
-            printf("0x%08lx\n", ps_detector);
     }
 }
 
