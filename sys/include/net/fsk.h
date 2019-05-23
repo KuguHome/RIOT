@@ -49,10 +49,10 @@ extern "C" {
 #define FSK_HF_CHANNEL_DEFAULT     (860000000UL)                /**< Use to calibrate RX chain for LF and HF bands */
 #endif
 #ifndef FSK_BITRATE_DEFAULT
-#define FSK_BITRATE_DEFAULT        (32768UL)                   /**< Bitrate at 100kpbs */
+#define FSK_BITRATE_DEFAULT        (32630.920)                  /**< Bitrate at 100kpbs */
 #endif
 #ifndef FSK_FREQ_DEV_DEFAULT
-#define FSK_FREQ_DEV_DEFAULT       (38000UL)                    /**< 50KHz frequency deviation */
+#define FSK_FREQ_DEV_DEFAULT       (38000UL)                    /**< 38KHz frequency deviation */
 #endif
 #ifndef FSK_BANDWIDTH_DEFAULT
 #define FSK_BANDWIDTH_DEFAULT      (FSK_BITRATE_DEFAULT + \
