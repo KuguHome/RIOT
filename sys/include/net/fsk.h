@@ -55,11 +55,11 @@ extern "C" {
 #define FSK_FREQ_DEV_DEFAULT       (38000UL)                    /**< 38KHz frequency deviation */
 #endif
 #ifndef FSK_BANDWIDTH_DEFAULT
-#define FSK_BANDWIDTH_DEFAULT      (FSK_BITRATE_DEFAULT + \
-                                   (2 * FSK_FREQ_DEV_DEFAULT))  /**< Bandwidth calculation */
+#define FSK_BANDWIDTH_DEFAULT      (125000) /*(FSK_BITRATE_DEFAULT + \*/
+                                   /*(2 * FSK_FREQ_DEV_DEFAULT))*/  /**< Bandwidth calculation */
 #endif
 #ifndef FSK_AFC_BANDWIDTH_DEFAULT
-#define FSK_AFC_BANDWIDTH_DEFAULT  (200000UL)                   /**< 20KHz AFC Bandwidth */
+#define FSK_AFC_BANDWIDTH_DEFAULT  (100000UL)                   /**< 20KHz AFC Bandwidth */
 #endif
 #ifndef FSK_PAYLOADLENGTH_DEFAULT
 #define FSK_PAYLOADLENGTH_DEFAULT  (255)                      /**< Default payload length */
@@ -71,6 +71,11 @@ extern "C" {
 #define FSK_SYNCWORD_SYNCVALUE2    (0x3D)                     /**< Sync value for testing purposes (wM-Bus) */
 #endif
 /** @} */
+
+
+extern uint8_t fsk_reg_settings [127];
+
+
 
 #ifdef __cplusplus
 }
