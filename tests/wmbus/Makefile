@@ -9,6 +9,7 @@ USEMODULE += shell
 USEMODULE += shell_commands
 USEMODULE += ps
 USEMODULE += xtimer
+USEMODULE += three_out_of_six
 
 DRIVER ?= sx1276
 
