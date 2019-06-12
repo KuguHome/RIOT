@@ -349,28 +349,29 @@ void sx127x_set_rx(sx127x_t *dev)
     switch (dev->settings.modem) {
         case SX127X_MODEM_FSK:
         {
-            if (dev->settings.fsk.flags & SX127X_AFC_ON_FLAG) {
-                sx127x_reg_write(dev, SX127X_REG_RXCONFIG,
-                        ((sx127x_reg_read(dev, SX127X_REG_RXCONFIG) &
-                                SX127X_RF_RXCONFIG_RESTARTRXONCOLLISION_MASK &
-                                SX127X_RF_RXCONFIG_AFCAUTO_MASK &
-                                SX127X_RF_RXCONFIG_AGCAUTO_MASK) |
-                                SX127X_RF_RXCONFIG_RESTARTRXONCOLLISION_OFF |
-                                SX127X_RF_RXCONFIG_AFCAUTO_ON |
-                                SX127X_RF_RXCONFIG_AGCAUTO_ON));
-            }
-            else {
-                sx127x_reg_write(dev, SX127X_REG_RXCONFIG,
-                                 ((sx127x_reg_read(dev, SX127X_REG_RXCONFIG) &
-                                 SX127X_RF_RXCONFIG_RESTARTRXONCOLLISION_MASK &
-                                 SX127X_RF_RXCONFIG_RESTARTRXWITHOUTPLLLOCK_MASK &
-                                 SX127X_RF_RXCONFIG_AFCAUTO_MASK &
-                                 SX127X_RF_RXCONFIG_AGCAUTO_MASK) |
-                                 SX127X_RF_RXCONFIG_RESTARTRXONCOLLISION_ON |
-                                 SX127X_RF_RXCONFIG_RESTARTRXWITHOUTPLLLOCK |
-                                 SX127X_RF_RXCONFIG_AFCAUTO_OFF |
-                                 SX127X_RF_RXCONFIG_AGCAUTO_ON));
-            }
+//            if (dev->settings.fsk.flags & SX127X_AFC_ON_FLAG) {
+//                sx127x_reg_write(dev, SX127X_REG_RXCONFIG,
+//                        ((sx127x_reg_read(dev, SX127X_REG_RXCONFIG) &
+//                                SX127X_RF_RXCONFIG_RESTARTRXONCOLLISION_MASK &
+//                                SX127X_RF_RXCONFIG_AFCAUTO_MASK &
+//                                SX127X_RF_RXCONFIG_AGCAUTO_MASK) |
+//                                SX127X_RF_RXCONFIG_RESTARTRXONCOLLISION_OFF |
+//                                SX127X_RF_RXCONFIG_AFCAUTO_ON |
+//                                SX127X_RF_RXCONFIG_AGCAUTO_ON));
+//            }
+//            else {
+//                sx127x_reg_write(dev, SX127X_REG_RXCONFIG,
+//                                 ((sx127x_reg_read(dev, SX127X_REG_RXCONFIG) &
+//                                 SX127X_RF_RXCONFIG_RESTARTRXONCOLLISION_MASK &
+//                                 SX127X_RF_RXCONFIG_RESTARTRXWITHOUTPLLLOCK_MASK &
+//                                 SX127X_RF_RXCONFIG_AFCAUTO_MASK &
+//                                 SX127X_RF_RXCONFIG_AGCAUTO_MASK) |
+//                                 SX127X_RF_RXCONFIG_RESTARTRXONCOLLISION_OFF |
+//                                 SX127X_RF_RXCONFIG_RESTARTRXWITHOUTPLLLOCK |
+//                                 SX127X_RF_RXCONFIG_AFCAUTO_OFF |
+//                                 SX127X_RF_RXCONFIG_AGCAUTO_ON));
+//            }
+            sx127x_reg_write(dev, SX127X_REG_RXCONFIG, 0x0E);
         }
 
         sx127x_set_op_mode(dev, SX127X_RF_OPMODE_RECEIVER);
@@ -938,70 +939,78 @@ void sx127x_set_tx_power(sx127x_t *dev, int8_t power)
     dev->settings.power = power;
 
     uint8_t pa_config = sx127x_reg_read(dev, SX127X_REG_PACONFIG);
+
+    if (dev->settings.modem == SX127X_MODEM_LORA) {
 #if defined(MODULE_SX1272)
-    uint8_t pa_dac = sx127x_reg_read(dev, SX1272_REG_PADAC);
+        uint8_t pa_dac = sx127x_reg_read(dev, SX1272_REG_PADAC);
 #else /* MODULE_SX1276 */
-    uint8_t pa_dac = sx127x_reg_read(dev, SX1276_REG_PADAC);
+        uint8_t pa_dac = sx127x_reg_read(dev, SX1276_REG_PADAC);
 #endif
 
-    pa_config = ((pa_config & SX127X_RF_PACONFIG_PASELECT_MASK) |
-                 sx127x_get_pa_select(dev));
+        pa_config = ((pa_config & SX127X_RF_PACONFIG_PASELECT_MASK) |
+                     sx127x_get_pa_select(dev));
 
 #if defined(MODULE_SX1276)
-    /* max power is 14dBm */
-    pa_config = (pa_config & SX127X_RF_PACONFIG_MAX_POWER_MASK) | 0x70;
+        /* max power is 14dBm */
+        pa_config = (pa_config & SX127X_RF_PACONFIG_MAX_POWER_MASK) | 0x70;
 #endif
 
-    sx127x_reg_write(dev, SX127X_REG_PARAMP, SX127X_RF_PARAMP_0050_US);
+        sx127x_reg_write(dev, SX127X_REG_PARAMP, SX127X_RF_PARAMP_0050_US);
 
-    if ((pa_config & SX127X_RF_PACONFIG_PASELECT_PABOOST)
-        == SX127X_RF_PACONFIG_PASELECT_PABOOST) {
-        if (power > 17) {
-            pa_dac = ((pa_dac & SX127X_RF_PADAC_20DBM_MASK) |
-                      SX127X_RF_PADAC_20DBM_ON);
-        } else {
-            pa_dac = ((pa_dac & SX127X_RF_PADAC_20DBM_MASK) |
-                      SX127X_RF_PADAC_20DBM_OFF);
-        }
-        if ((pa_dac & SX127X_RF_PADAC_20DBM_ON) == SX127X_RF_PADAC_20DBM_ON) {
-            if (power < 5) {
-                power = 5;
-            }
-            if (power > 20) {
-                power = 20;
-            }
-
-            pa_config = ((pa_config & SX127X_RF_PACONFIG_OUTPUTPOWER_MASK) |
-                         (uint8_t)((uint16_t)(power - 5) & 0x0F));
-        } else {
-            if (power < 2) {
-                power = 2;
-            }
+        if ((pa_config & SX127X_RF_PACONFIG_PASELECT_PABOOST)
+            == SX127X_RF_PACONFIG_PASELECT_PABOOST) {
             if (power > 17) {
-                power = 17;
+                pa_dac = ((pa_dac & SX127X_RF_PADAC_20DBM_MASK) |
+                          SX127X_RF_PADAC_20DBM_ON);
+            } else {
+                pa_dac = ((pa_dac & SX127X_RF_PADAC_20DBM_MASK) |
+                          SX127X_RF_PADAC_20DBM_OFF);
+            }
+            if ((pa_dac & SX127X_RF_PADAC_20DBM_ON) == SX127X_RF_PADAC_20DBM_ON) {
+                if (power < 5) {
+                    power = 5;
+                }
+                if (power > 20) {
+                    power = 20;
+                }
+
+                pa_config = ((pa_config & SX127X_RF_PACONFIG_OUTPUTPOWER_MASK) |
+                             (uint8_t)((uint16_t)(power - 5) & 0x0F));
+            } else {
+                if (power < 2) {
+                    power = 2;
+                }
+                if (power > 17) {
+                    power = 17;
+                }
+
+                pa_config = ((pa_config & SX127X_RF_PACONFIG_OUTPUTPOWER_MASK) |
+                             (uint8_t)((uint16_t)(power - 2) & 0x0F));
+            }
+        } else {
+            if (power < -1) {
+                power = -1;
+            }
+            if (power > 14) {
+                power = 14;
             }
 
             pa_config = ((pa_config & SX127X_RF_PACONFIG_OUTPUTPOWER_MASK) |
-                         (uint8_t)((uint16_t)(power - 2) & 0x0F));
-        }
-    } else {
-        if (power < -1) {
-            power = -1;
-        }
-        if (power > 14) {
-            power = 14;
+                         (uint8_t)((uint16_t)(power + 1) & 0x0F));
         }
 
+        sx127x_reg_write(dev, SX127X_REG_PACONFIG, pa_config);
+#if defined(MODULE_SX1272)
+        sx127x_reg_write(dev, SX1272_REG_PADAC, pa_dac);
+#else /* MODULE_SX1276 */
+        sx127x_reg_write(dev, SX1276_REG_PADAC, pa_dac);
+#endif
+    }
+    else {
         pa_config = ((pa_config & SX127X_RF_PACONFIG_OUTPUTPOWER_MASK) |
                      (uint8_t)((uint16_t)(power + 1) & 0x0F));
+        sx127x_reg_write(dev, SX127X_REG_PACONFIG, pa_config);
     }
-
-    sx127x_reg_write(dev, SX127X_REG_PACONFIG, pa_config);
-#if defined(MODULE_SX1272)
-    sx127x_reg_write(dev, SX1272_REG_PADAC, pa_dac);
-#else /* MODULE_SX1276 */
-    sx127x_reg_write(dev, SX1276_REG_PADAC, pa_dac);
-#endif
 }
 
 uint16_t sx127x_get_preamble_length(const sx127x_t *dev)
@@ -1093,9 +1102,7 @@ void sx127x_set_lna(sx127x_t *dev, uint8_t value)
 {
     DEBUG("[sx127x] Set LNA: %d\n", value);
     dev->settings.lna = value;
-    sx127x_reg_write(dev, SX127X_REG_LR_LNA,
-                     (sx127x_reg_read(dev, SX127X_REG_LR_LNA) &
-                      SX127X_RF_LNA_GAIN_MASK) | value);
+    sx127x_reg_write(dev, SX127X_REG_LNA, SX127X_RF_LNA_GAIN_MASK | value);
 }
 
 void sx127x_set_syncconfig(sx127x_t *dev, uint8_t autorestart_rx_mode,

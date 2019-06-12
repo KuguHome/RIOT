@@ -164,15 +164,29 @@ void sx127x_init_fsk_settings(sx127x_t *dev, uint8_t mode)
     DEBUG("[sx127x] initializing FSK settings\n");
     sx127x_reset(dev);
     sx127x_set_op_mode(dev, SX127X_RF_OPMODE_SLEEP);
+/**
+ * Omit for now API settings, go straight and set the registers
+ * manually
+ */
     sx127x_set_modem(dev, SX127X_MODEM_FSK);
 #if defined(MODULE_SX1276)
     sx127x_set_tx_power(dev, 20);
 #else /* MODULE_SX1272 */
     sx127x_set_tx_power(dev, 14);
 #endif
-    sx127x_set_lna(dev, SX127X_RF_LNA_GAIN_G1);
-    sx127x_fsk_set_afc(dev, true);
-    sx127x_set_packetconfig1(dev, SX127X_RF_PACKETCONFIG1_PACKETFORMAT_VARIABLE,
+    sx127x_reg_write(dev, SX127X_REG_PARAMP, 0x19);
+    //sx127x_set_lna(dev, SX127X_RF_LNA_GAIN_G3);
+    sx127x_reg_write(dev, SX127X_REG_LNA, 0x20);
+    sx127x_fsk_set_afc(dev, false);
+    sx127x_reg_write(dev, SX127X_REG_FDEVMSB, 0x02);
+    sx127x_reg_write(dev, SX127X_REG_FDEVLSB, 0x6F);
+    sx127x_set_rxbw(dev, 0, FSK_BANDWIDTH_DEFAULT);
+    //sx127x_set_afcbw(dev, FSK_AFC_BANDWIDTH_DEFAULT);
+    sx127x_reg_write(dev, SX127X_REG_AFCBW, 0x0B);
+    sx127x_reg_write(dev, SX127X_REG_FEIMSB, (sx127x_reg_read(dev, SX127X_REG_FEIMSB) | 0xFF));
+    sx127x_reg_write(dev, SX127X_REG_FEILSB, (sx127x_reg_read(dev, SX127X_REG_FEIMSB) | 0x65));
+    sx127x_reg_write(dev, SX127X_REG_OSC, 0x0F);
+    sx127x_set_packetconfig1(dev, SX127X_RF_PACKETCONFIG1_PACKETFORMAT_FIXED,
                              SX127X_RF_PACKETCONFIG1_DCFREE_OFF,
                              SX127X_RF_PACKETCONFIG1_CRC_ON,
                              SX127X_RF_PACKETCONFIG1_CRCAUTOCLEAR_ON,
@@ -181,6 +195,29 @@ void sx127x_init_fsk_settings(sx127x_t *dev, uint8_t mode)
     switch (mode)
     {
     case SX127X_FSK_PACKET_MODE:
+//        sx127x_set_dio_mapping1(dev, SX127X_RF_DIOMAPPING1_DIO0_00, /* PayloadReady */
+//                                SX127X_RF_DIOMAPPING1_DIO1_00,      /* FifoLevel */
+//                                SX127X_RF_DIOMAPPING1_DIO2_11,      /* SyncAddress */
+//                                SX127X_RF_DIOMAPPING1_DIO3_00);     /* FifoEmpty */
+//        sx127x_set_dio_mapping2(dev, SX127X_RF_DIOMAPPING2_DIO4_11, /* PreambleDetected */
+//                                SX127X_RF_DIOMAPPING2_DIO5_11);     /* ModeReady */
+//
+//        sx127x_set_state(dev, SX127X_RF_IDLE);
+//        for (size_t i = 0; i < sizeof(fsk_reg_settings); i++) {
+//            DEBUG("Setting reg 0x%02X -> 0x%02X\n", i + 1, fsk_reg_settings[i]);
+//            switch (i) {
+//            case 0x11:
+//            case 0x3C:
+//            case 0x3E:
+//            case 0x3F:
+//            case 0x42:
+//                break;
+//            default:
+//                sx127x_reg_write(dev, i + 1, fsk_reg_settings[i]);
+//            }
+//        }
+//        sx127x_set_state(dev, SX127X_RF_RX_RUNNING);
+        sx127x_reg_write(dev, SX127X_REG_PREAMBLELSB, 0x18);
         sx127x_set_syncconfig(dev, SX127X_RF_SYNCCONFIG_AUTORESTARTRXMODE_WAITPLL_ON,
                               SX127X_RF_SYNCCONFIG_PREAMBLEPOLARITY_AA,
                               SX127X_RF_SYNCCONFIG_SYNC_ON,
@@ -188,22 +225,36 @@ void sx127x_init_fsk_settings(sx127x_t *dev, uint8_t mode)
                               SX127X_RF_SYNCCONFIG_SYNCSIZE_2);
         sx127x_fsk_set_syncword(dev, FSK_SYNCWORD_SYNCVALUE1, 1);
         sx127x_fsk_set_syncword(dev, FSK_SYNCWORD_SYNCVALUE2, 2);
-        sx127x_set_payload_length(dev, FSK_PAYLOADLENGTH_DEFAULT);
-//        sx127x_set_fsk_mod_shaping(dev, SX127X_RF_OPMODE_MODULATIONSHAPING_10);
+        sx127x_fsk_set_syncword(dev, 0x01, 3);
+        sx127x_fsk_set_syncword(dev, 0x01, 4);
+        sx127x_fsk_set_syncword(dev, 0x01, 5);
+        sx127x_fsk_set_syncword(dev, 0x01, 6);
+        sx127x_fsk_set_syncword(dev, 0x01, 7);
+        sx127x_fsk_set_syncword(dev, 0x01, 8);
+        sx127x_set_payload_length(dev, 0x1B);
+        sx127x_set_fsk_mod_shaping(dev, SX127X_RF_OPMODE_MODULATIONSHAPING_01);
         sx127x_reg_write(dev, SX127X_REG_FIFOTHRESH,
                          ((sx127x_reg_read(dev, SX127X_REG_FIFOTHRESH) &
+                         SX127X_RF_FIFOTHRESH_TXSTARTCONDITION_MASK &
                          SX127X_RF_FIFOTHRESH_FIFOTHRESHOLD_MASK) |
-                         0x01));
+                         SX127X_RF_FIFOTHRESH_TXSTARTCONDITION_FIFONOTEMPTY |
+                         0x0F));
+#if defined(MODULE_SX1272)
+        sx127x_reg_write(dev, SX127X_REG_IMAGECAL, 0x02);
+#endif
         sx127x_set_packetconfig2(dev, SX127X_RF_PACKETCONFIG2_WMBUS_CRC_DISABLE,
                                  SX127X_RF_PACKETCONFIG2_DATAMODE_PACKET,
                                  SX127X_RF_PACKETCONFIG2_IOHOME_OFF,
                                  SX127X_RF_PACKETCONFIG2_BEACON_OFF);
         sx127x_set_dio_mapping1(dev, SX127X_RF_DIOMAPPING1_DIO0_00, /* PayloadReady */
                                 SX127X_RF_DIOMAPPING1_DIO1_00,      /* FifoLevel */
-                                SX127X_RF_DIOMAPPING1_DIO2_11,      /* SyncAddress */
-                                SX127X_RF_DIOMAPPING1_DIO3_00);     /* FifoEmpty */
+                                SX127X_RF_DIOMAPPING1_DIO2_00,      /* SyncAddress */
+                                SX127X_RF_DIOMAPPING1_DIO3_01);     /* FifoEmpty */
         sx127x_set_dio_mapping2(dev, SX127X_RF_DIOMAPPING2_DIO4_11, /* PreambleDetected */
                                 SX127X_RF_DIOMAPPING2_DIO5_11);     /* ModeReady */
+        dev->settings.fsk.flags &= ~SX127X_PREAMBLE_DETECTED_FLAG;
+        dev->settings.fsk.flags &= ~SX127X_SYNC_WORD_DETECTED_FLAG;
+        sx127x_reg_write(dev, 0x70, 0x0B);
         break;
 
     case SX127X_FSK_CONTINUOUS_MODE:
@@ -236,14 +287,24 @@ void sx127x_init_fsk_settings(sx127x_t *dev, uint8_t mode)
     sx127x_fsk_set_preamble_detector_size(dev, SX127X_RF_PREAMBLEDETECT_DETECTORSIZE_1);
     sx127x_fsk_set_preamble_detector_tol(dev, SX127X_RF_PREAMBLEDETECT_DETECTORTOL_10);
     sx127x_set_rx_trigger(dev, SX127X_RF_RXCONFIG_RXTRIGER_PREAMBLEDETECT);
-    sx127x_set_map_preamble_detect(dev, SX127X_RF_DIOMAPPING2_MAP_PREAMBLEDETECT);
-    sx127x_set_channel(dev, FSK_CHANNEL_DEFAULT);
+    sx127x_set_map_preamble_detect(dev, SX127X_RF_DIOMAPPING2_MAP_RSSI);
+    //sx127x_set_channel(dev, FSK_CHANNEL_DEFAULT);
+    sx127x_reg_write(dev, SX127X_REG_FRFMSB, 0xD9);
+    sx127x_reg_write(dev, SX127X_REG_FRFMID, 0x3C);
+    sx127x_reg_write(dev, SX127X_REG_FRFLSB, 0xCD);
     sx127x_set_bitrate(dev, FSK_BITRATE_DEFAULT);
-    sx127x_set_freqdev(dev, FSK_FREQ_DEV_DEFAULT);
-    sx127x_set_rxbw(dev, 0, FSK_BANDWIDTH_DEFAULT);
-    sx127x_set_afcbw(dev, FSK_AFC_BANDWIDTH_DEFAULT);
+    //sx127x_set_freqdev(dev, FSK_FREQ_DEV_DEFAULT);
     sx127x_fsk_set_rssi_offset(dev, 0);
-    //sx127x_set_standby(dev);
+    sx127x_reg_write(dev, 0x48, 0x00);
+    sx127x_reg_write(dev, 0x49, 0x01);
+    sx127x_reg_write(dev, 0x55, 0x00);
+    sx127x_reg_write(dev, 0x57, 0x00);
+    sx127x_reg_write(dev, 0x64, 0x00);
+    sx127x_reg_write(dev, 0x6C, 0x00);
+    sx127x_reg_write(dev, 0x6D, 0x13);
+    sx127x_reg_write(dev, 0x6E, 0x26);
+    sx127x_reg_write(dev, 0x6F, 0x01);
+//      sx127x_set_standby(dev);
 #if defined(MODULE_SX1276)
     sx1276_rx_chain_calibration(dev, FSK_HF_CHANNEL_DEFAULT);
 #endif

@@ -29,7 +29,7 @@ extern "C" {
 /**
  * @brief   Reference to the netdev device driver struct
  */
-extern const netdev_driver_t sx127x_driver;
+extern netdev_driver_t sx127x_driver;
 
 /**
  * @brief   Received LoRa packet status information

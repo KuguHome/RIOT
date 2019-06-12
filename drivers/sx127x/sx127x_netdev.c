@@ -342,12 +342,12 @@ static int _init(netdev_t *netdev)
     }
 
     /* Configure radio according to the requested mode */
-//    if(settings.modem == SX127X_MODEM_LORA) {
-//        sx127x_init_lora_settings(sx127x);
-//    }
-//    else {
+    if(settings.modem == SX127X_MODEM_LORA) {
+        sx127x_init_lora_settings(sx127x);
+    }
+    else {
         sx127x_init_fsk_settings(sx127x, SX127X_FSK_PACKET_MODE);
-//    }
+    }
 
     /* Put chip into sleep */
     sx127x_set_sleep(sx127x);
@@ -733,9 +733,9 @@ void _on_dio0_irq(void *arg)
                     ((dev->settings.fsk.flags & SX127X_SYNC_WORD_DETECTED_FLAG) == false)) {
                     dev->settings.fsk.flags |= SX127X_SYNC_WORD_DETECTED_FLAG;
                     dev->settings.fsk.pkt_handler.rssi_value = sx127x_read_rssi(dev);
-                    dev->settings.fsk.afc_value = (int32_t)(double)(((uint16_t)sx127x_reg_read(dev, SX127X_REG_AFCMSB) << 8) |
-                                                  (uint16_t)sx127x_reg_read(dev, SX127X_REG_AFCLSB)) * FSK_FREQ_STEP_DEFAULT;
-                    dev->settings.fsk.rx_gain = (sx127x_reg_read(dev, SX127X_REG_LNA) >> 5) & 0x07;
+//                    dev->settings.fsk.afc_value = (int32_t)(double)(((uint16_t)sx127x_reg_read(dev, SX127X_REG_AFCMSB) << 8) |
+//                                                  (uint16_t)sx127x_reg_read(dev, SX127X_REG_AFCLSB)) * FSK_FREQ_STEP_DEFAULT;
+//                    dev->settings.fsk.rx_gain = (sx127x_reg_read(dev, SX127X_REG_LNA) >> 5) & 0x07;
                 }
             }
             break;
@@ -778,7 +778,19 @@ void _on_dio1_irq(void *arg)
                     if ((dev->settings.fsk.flags & SX127X_RX_FSK_CONTINUOUS_FLAG) == false) {
                         DEBUG("[sx127x] netdev: sx127x_on_dio1 -> FifoLevel\n");
                         /* FifoLevel interrupt, some payload is available */
-                        netdev->event_callback(netdev, NETDEV_EVENT_RX_COMPLETE);
+//                        if ((dev->settings.fsk.flags & SX127X_PREAMBLE_DETECTED_FLAG) &&
+//                            (dev->settings.fsk.flags & SX127X_SYNC_WORD_DETECTED_FLAG)) {
+//                        if ((sx127x_reg_read(dev, SX127X_REG_IRQFLAGS1) &
+//                             SX127X_RF_IRQFLAGS1_PREAMBLEDETECT)) {
+                            netdev->event_callback(netdev, NETDEV_EVENT_RX_COMPLETE);
+//                        }
+//                        }
+//                        else {
+//                            dev->settings.fsk.flags &= ~SX127X_PREAMBLE_DETECTED_FLAG;
+//                            dev->settings.fsk.flags &= ~SX127X_SYNC_WORD_DETECTED_FLAG;
+//                            uint8_t state = NETOPT_STATE_RX;
+//                            netdev->driver->set(netdev, NETOPT_STATE, &state, sizeof(state));
+//                        }
                     }
                     else {
 
@@ -828,9 +840,14 @@ void _on_dio2_irq(void *arg)
                                 ((dev->settings.fsk.flags & SX127X_SYNC_WORD_DETECTED_FLAG) == false)) {
                             dev->settings.fsk.flags |= SX127X_SYNC_WORD_DETECTED_FLAG;
                             dev->settings.fsk.pkt_handler.rssi_value = sx127x_read_rssi(dev);
-                            dev->settings.fsk.afc_value = (int32_t)(double)(((uint16_t)sx127x_reg_read(dev, SX127X_REG_AFCMSB) << 8) |
-                                                          (uint16_t)sx127x_reg_read(dev, SX127X_REG_AFCLSB)) * FSK_FREQ_STEP_DEFAULT;
-                            dev->settings.fsk.rx_gain = (sx127x_reg_read(dev, SX127X_REG_LNA) >> 5) & 0x07;
+//                            dev->settings.fsk.afc_value = (int32_t)(double)(((uint16_t)sx127x_reg_read(dev, SX127X_REG_AFCMSB) << 8) |
+//                                                          (uint16_t)sx127x_reg_read(dev, SX127X_REG_AFCLSB)) * FSK_FREQ_STEP_DEFAULT;
+//                            dev->settings.fsk.rx_gain = (sx127x_reg_read(dev, SX127X_REG_LNA) >> 5) & 0x07;
+//                            netdev->event_callback(netdev, NETDEV_EVENT_RX_COMPLETE);
+                        }
+                        else {
+                            dev->settings.fsk.flags &= ~SX127X_PREAMBLE_DETECTED_FLAG;
+                            dev->settings.fsk.flags &= ~SX127X_SYNC_WORD_DETECTED_FLAG;
                         }
                     }
                     else {
@@ -891,6 +908,7 @@ void _on_dio3_irq(void *arg)
                 /* FifoEmpty interrupt, switch to RX state */
                 uint8_t state = NETOPT_STATE_RX;
                 netdev->driver->set(netdev, NETOPT_STATE, &state, sizeof(state));
+//                netdev->event_callback(netdev, NETDEV_EVENT_RX_COMPLETE);
             }
             else {
                 /* PreambleDetected interrupt, only available in fixed packet length mode */
@@ -922,14 +940,22 @@ void _on_dio4_irq(void *arg)
 {
     /* Get interrupt context */
     sx127x_t *dev = (sx127x_t *) arg;
+//    netdev_t *netdev = (netdev_t *) dev;
 
     switch (dev->settings.modem) {
         case SX127X_MODEM_FSK:
             if ((dev->settings.fsk.flags & SX127X_RX_FSK_CONTINUOUS_FLAG) == false) {
                 /* PreambleDetected interrupt, only available in fixed packet length mode */
-                if ((dev->settings.fsk.flags & SX127X_PREAMBLE_DETECTED_FLAG) == false) {
+                if (((dev->settings.fsk.flags & SX127X_PREAMBLE_DETECTED_FLAG) == false) &&
+                    ((dev->settings.fsk.flags & SX127X_SYNC_WORD_DETECTED_FLAG) == false)) {
                     DEBUG("[sx127x] netdev: sx127x_on_dio4 -> PreambleDetected\n");
                     dev->settings.fsk.flags |= SX127X_PREAMBLE_DETECTED_FLAG;
+//                    sx127x_reg_write(dev, SX127X_REG_IRQFLAGS1, SX127X_RF_IRQFLAGS1_PREAMBLEDETECT);
+//                    netdev->event_callback(netdev, NETDEV_EVENT_RX_COMPLETE);
+                }
+                else {
+                    dev->settings.fsk.flags &= ~SX127X_PREAMBLE_DETECTED_FLAG;
+//                    dev->settings.fsk.flags &= ~SX127X_SYNC_WORD_DETECTED_FLAG;
                 }
             }
             else {
@@ -962,7 +988,7 @@ void _on_dio5_irq(void *arg)
     }
 }
 
-const netdev_driver_t sx127x_driver = {
+netdev_driver_t sx127x_driver = {
     .send = _send,
     .recv = _recv,
     .init = _init,
